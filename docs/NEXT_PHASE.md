@@ -1,10 +1,11 @@
-# Project Status: Phase 6 Complete
+# Project Status: Phase 6 Complete — Production Live
 
 ## Status
 
-**Phase 6 is complete. The project is deployment-ready and live on Vercel.**
+**Phase 6 is complete. The production URL is live and fully verified by the user.**
 
-All six development phases (1 → 2 → 3 → 4 → 5 → 5.5 → 6) are finished and manually tested.
+All development phases (1 → 2 → 3 → 4 → 5 → 5.5 → 6) are finished and manually tested.
+Supabase Auth (Site URL + Redirect URLs) and Vercel environment variables are correctly configured.
 See `docs/PROJECT_PROGRESS.md` for the full history.
 
 ---

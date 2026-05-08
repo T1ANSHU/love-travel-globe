@@ -1,6 +1,6 @@
 # Project Progress
 
-Last updated: 2026-05-09 (Phase 6 complete — project deployed)
+Last updated: 2026-05-09 (Phase 6 complete — production URL live and verified)
 
 ## Completed
 
@@ -187,6 +187,14 @@ Last updated: 2026-05-09 (Phase 6 complete — project deployed)
   - Upload photo → appears in album; refresh → data persists (Supabase cloud)
   - Tag filtering, timeline, replay, hover preview, city memory card all normal
   - Logout → redirects to `/login`
+- **Production deployment manually verified by user**:
+  - Production Vercel URL opens correctly
+  - Login / register flow confirmed working in production
+  - Auth redirect (Supabase Auth Site URL + Redirect URLs) confirmed — no 404
+  - Globe page loads after login in production
+  - Photo upload confirmed working in production
+  - Data persists after page refresh in production
+  - Supabase environment variables correctly configured on Vercel
 
 ## Not Started
 
