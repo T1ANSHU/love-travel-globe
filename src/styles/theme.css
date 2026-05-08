@@ -1,0 +1,88 @@
+/* Pink dreamy theme variables */
+:root {
+  --color-pink-50:  #fdf2f8;
+  --color-pink-100: #fce7f3;
+  --color-pink-200: #fbcfe8;
+  --color-pink-300: #f9a8d4;
+  --color-pink-400: #f472b6;
+  --color-pink-500: #ec4899;
+  --color-pink-600: #db2777;
+
+  --color-rose-300: #fda4af;
+  --color-rose-400: #fb7185;
+
+  --color-purple-300: #d8b4fe;
+  --color-purple-400: #c084fc;
+
+  /* Glass morphism */
+  --glass-bg: rgba(255, 255, 255, 0.15);
+  --glass-border: rgba(255, 255, 255, 0.3);
+  --glass-shadow: 0 8px 32px rgba(236, 72, 153, 0.15);
+  --glass-blur: blur(16px);
+
+  /* Glow */
+  --glow-pink: 0 0 20px rgba(244, 114, 182, 0.5);
+  --glow-rose: 0 0 20px rgba(251, 113, 133, 0.4);
+}
+
+/* Reusable glass card */
+.glass-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-shadow);
+  border-radius: 1rem;
+}
+
+/* Pink dreamy background gradient */
+.bg-dreamy {
+  background: linear-gradient(
+    135deg,
+    #fce7f3 0%,
+    #fdf2f8 25%,
+    #ede9fe 50%,
+    #fce7f3 75%,
+    #fff1f2 100%
+  );
+  background-size: 400% 400%;
+  animation: dreamyShift 12s ease infinite;
+}
+
+@keyframes dreamyShift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Floating animation */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-12px); }
+}
+
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+/* Bounce in */
+@keyframes bounceIn {
+  0%   { opacity: 0; transform: scale(0.3); }
+  50%  { opacity: 1; transform: scale(1.05); }
+  70%  { transform: scale(0.95); }
+  100% { transform: scale(1); }
+}
+
+.animate-bounce-in {
+  animation: bounceIn 0.6s cubic-bezier(0.36, 0.07, 0.19, 0.97) forwards;
+}
+
+/* Pulse glow */
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: var(--glow-pink); }
+  50%       { box-shadow: 0 0 40px rgba(244, 114, 182, 0.8); }
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 3s ease-in-out infinite;
+}
