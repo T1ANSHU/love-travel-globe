@@ -9,6 +9,7 @@ import { Button } from '../UI/Button'
 import { GlassCard } from '../UI/GlassCard'
 import { siteConfig } from '../../config/siteConfig'
 import { AuthorCredit } from '../UI/AuthorCredit'
+import { ParticlesBackground } from '../UI/ParticlesBackground'
 
 const schema = z.object({
   email: z.string().email('请输入有效的邮箱地址'),
@@ -36,6 +37,8 @@ export function LoginPage() {
 
   return (
     <div className="min-h-screen bg-dreamy flex items-center justify-center p-4">
+      <ParticlesBackground />
+
       {/* Decorative blobs */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute -top-20 -left-20 h-80 w-80 rounded-full bg-pink-200/40 blur-3xl" />

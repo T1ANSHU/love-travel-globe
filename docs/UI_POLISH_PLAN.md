@@ -51,19 +51,24 @@
 ## Phase P1 — Login / Register Page Polish
 
 **Backlog ref**: not in BACKLOG (standalone module)
-**Status**: `[ pending references ]`
+**Status**: `[ in progress — Experiment 01 active on branch ui-polish-experiments ]`
 
-### Scope
-- Background treatment: animated gradient, floating blobs, or subtle noise texture
+### Experiment 01 — Magic UI Particles background
+**Result**: Particles render correctly on login/register pages; `pointer-events: none`; build passes.
+**Issue**: Still too subtle against the soft pink background. Individual particles blend into existing blur blobs.
+**Next**: Increase size (base 1.8–2.4 px), raise quantity (120–160 total), consider exposing `targetAlpha` ceiling in core, strengthen mouse-interaction, or add a faint radial glow per particle.
+**Merge status**: Not merged to main. Branch: `ui-polish-experiments`.
+
+### Remaining P1 scope (not yet started)
 - Card layout: GlassCard refinement — warmer tint, softer glow
 - Input fields: border transitions, focus glow, error states
 - Button: hover glow, loading spinner
 - AuthorCredit: minor typography refinement
 - Transition between login ↔ register: smooth cross-fade
 
-### Design questions to resolve before implementing
+### Design questions (still open)
 - [ ] Static background vs subtle animated gradient?
-- [ ] Mouse-follow light halo on background?
+- [x] Mouse-follow particle effect → chosen; tuning in progress
 - [ ] Font: keep system default or load Nunito / Quicksand?
 
 ---

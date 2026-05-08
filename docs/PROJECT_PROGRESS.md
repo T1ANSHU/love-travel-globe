@@ -1,6 +1,6 @@
 # Project Progress
 
-Last updated: 2026-05-09 (Phase 6 complete — production URL live and verified)
+Last updated: 2026-05-09 (Phase 6 complete — UI Polish experiments started on `ui-polish-experiments` branch)
 
 ## Completed
 
@@ -196,7 +196,44 @@ Last updated: 2026-05-09 (Phase 6 complete — production URL live and verified)
   - Data persists after page refresh in production
   - Supabase environment variables correctly configured on Vercel
 
+## UI Polish — In Progress (branch: `ui-polish-experiments`)
+
+> Work below is experimental. Not yet merged to main. Do not treat as finalized.
+
+### Experiment 01 — Magic UI Particles on Auth Pages
+
+**Status**: `[ in progress — needs visual tuning ]`
+**Branch**: `ui-polish-experiments`
+**Reference**: Magic UI Particles (magicui.design/docs/components/particles)
+
+**Files added / modified:**
+- `src/components/UI/ParticlesBackground.tsx` — new; self-contained canvas particle engine adapted from Magic UI (MIT); exports `Particles` core component + `ParticlesBackground` convenience wrapper
+- `src/components/Auth/LoginPage.tsx` — added `<ParticlesBackground />` as first child (behind blobs and card)
+- `src/components/Auth/RegisterPage.tsx` — same, in both main view and post-registration success view
+
+**Current particle configuration (two-layer):**
+
+| Layer | quantity | color | size (base px) | staticity | ease |
+|---|---|---|---|---|---|
+| A — rose | 80 | `#f9a8d4` pink-300 | 1.4 (range 1.4–3.4) | 70 | 85 |
+| B — white | 55 | `#ffffff` | 0.9 (range 0.9–2.9) | 60 | 90 |
+| **Total** | **135** | — | — | — | — |
+
+**What works:**
+- Particles render on login and register pages only
+- `pointer-events: none`, `z-0` — never blocks cards, inputs, or buttons
+- GlobePage and all Phase 1–6 features completely unaffected
+- `npm run build` passes, TypeScript zero errors
+
+**Known issue / next improvement:**
+- Particles are still too subtle on the soft pink background — individual dots are hard to distinguish from the existing blur blobs
+- Next session: increase quantity further (120–160 total), increase `size` to 1.8–2.4 base, consider raising alpha ceiling (currently max 0.7 in core engine), add slight warm-white glow effect, strengthen mouse-interaction response
+
+**Not yet done:**
+- Not merged to main
+- Not deployed to production
+
 ## Not Started
 
 - **Audio Polish**: city/country unlock sound effect — sacred, ethereal, soft chime, magical, calm, dreamy; should play in sync with achievement animation; deferred until `MusicPanel` / `audioService` / audio asset management are finalised
-- UI / Animation Polish phase (intentionally deferred — see `docs/UI_POLISH_BACKLOG.md`)
+- Remaining UI Polish modules (see `docs/UI_POLISH_PLAN.md` and `docs/UI_POLISH_BACKLOG.md`)

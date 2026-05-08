@@ -8,6 +8,7 @@ import { signUp } from '../../services/authService'
 import { Button } from '../UI/Button'
 import { GlassCard } from '../UI/GlassCard'
 import { AuthorCredit } from '../UI/AuthorCredit'
+import { ParticlesBackground } from '../UI/ParticlesBackground'
 
 const schema = z.object({
   displayName: z.string().min(2, '昵称至少 2 个字符'),
@@ -47,6 +48,7 @@ export function RegisterPage() {
   if (success) {
     return (
       <div className="min-h-screen bg-dreamy flex items-center justify-center p-4">
+        <ParticlesBackground />
         <GlassCard className="p-10 max-w-md w-full text-center">
           <div className="text-5xl mb-4">💌</div>
           <h2 className="text-xl font-semibold text-pink-800 mb-2">注册成功！</h2>
@@ -63,6 +65,8 @@ export function RegisterPage() {
 
   return (
     <div className="min-h-screen bg-dreamy flex items-center justify-center p-4">
+      <ParticlesBackground />
+
       {/* Decorative blobs */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute -top-20 -left-20 h-80 w-80 rounded-full bg-pink-200/40 blur-3xl" />
