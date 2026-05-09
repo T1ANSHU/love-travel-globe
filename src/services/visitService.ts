@@ -62,6 +62,19 @@ export async function deleteUserPlaceByCity(
   return error ? error.message : null
 }
 
+export async function deleteUserPlaceByCountry(
+  userId: string,
+  countryId: string,
+): Promise<string | null> {
+  const { error } = await supabase
+    .from('user_places')
+    .delete()
+    .eq('user_id', userId)
+    .eq('country_id', countryId)
+    .eq('place_type', 'country')
+  return error ? error.message : null
+}
+
 // Stubs kept for future use
 export async function getVisitRecords(_userId: string) {
   return []

@@ -482,7 +482,7 @@ export function GlobeScene() {
     return unsub
   }, [])
 
-  // ── Sync visible markers (capitals + user-added + photo cities) ──────
+  // ── Sync visible markers (user-added + photo cities + geocoded places) ──────
   useEffect(() => {
     recomputeVisible()
 

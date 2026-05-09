@@ -5,7 +5,8 @@ import { usePlaceStore } from '../../store/placeStore'
 import { useAuthStore } from '../../store/authStore'
 import { useUserPhotos } from '../../hooks/useUserPhotos'
 import { deletePhotosByCityId } from '../../services/photoService'
-import { deleteUserPlaceByCity } from '../../services/visitService'
+import { deleteUserPlaceByCity, deleteUserPlaceByCountry } from '../../services/visitService'
+import { getCityById } from '../../data/cities'
 import { PhotoGrid } from './PhotoGrid'
 import { PhotoPreview } from './PhotoPreview'
 import { EmptyAlbumState } from './EmptyAlbumState'
@@ -87,10 +88,20 @@ export function AlbumModal({ place, initialView = 'album', onClose }: AlbumModal
     // Remove photos from local store
     usePhotoStore.getState().removePhotos(photos.map((p) => p.id))
 
-    // Remove user_place record (ignore error if it was never manually added)
     if (place.cityId) {
+      // Delete the explicit city record (no-op if it doesn't exist)
       await deleteUserPlaceByCity(userId, place.cityId)
       usePlaceStore.getState().removeCityId(place.cityId)
+
+      // If this city is the capital of a user-added country, also remove that
+      // country record. Without this, the capital re-appears on every refresh
+      // because recomputeVisible() adds it back via userAddedCountryIds.
+      const city = getCityById(place.cityId)
+      const { userAddedCountryIds } = usePlaceStore.getState()
+      if (city?.isCapital && place.countryId && userAddedCountryIds.has(place.countryId)) {
+        await deleteUserPlaceByCountry(userId, place.countryId)
+        usePlaceStore.getState().removeCountryId(place.countryId)
+      }
     }
 
     if (storageErrors.length > 0) {

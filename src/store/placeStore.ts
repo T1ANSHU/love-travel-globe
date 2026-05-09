@@ -16,6 +16,7 @@ interface PlaceStoreState {
   addCountry: (countryId: string) => Promise<{ ok: true } | { error: string }>
   addGeocodedPlace: (place: ResolvedPlace) => Promise<{ ok: true } | { error: string }>
   removeCityId: (cityId: string) => void
+  removeCountryId: (countryId: string) => void
 }
 
 export const usePlaceStore = create<PlaceStoreState>((set) => ({
@@ -63,8 +64,10 @@ export const usePlaceStore = create<PlaceStoreState>((set) => ({
         }
         if (p.place_type === 'country') {
           countryIds.add(p.country_id)
-          const capital = CITIES.find((c) => c.countryId === p.country_id && c.isCapital)
-          if (capital) cityIds.add(capital.id)
+          // Do NOT add the capital to cityIds here — recomputeVisible() handles
+          // country→capital rendering via userAddedCountryIds. Adding here would
+          // make userAddedCityIds contain capitals that were never explicitly added
+          // as cities, breaking the delete flow.
         }
       }
       set({ userAddedCityIds: cityIds, userAddedCountryIds: countryIds, geocodedPlaces, loading: false })
@@ -121,6 +124,13 @@ export const usePlaceStore = create<PlaceStoreState>((set) => ({
       const newGeocodedPlaces = new Map(s.geocodedPlaces)
       newGeocodedPlaces.delete(cityId)
       return { userAddedCityIds: newCityIds, geocodedPlaces: newGeocodedPlaces }
+    }),
+
+  removeCountryId: (countryId) =>
+    set((s) => {
+      const newCountryIds = new Set(s.userAddedCountryIds)
+      newCountryIds.delete(countryId)
+      return { userAddedCountryIds: newCountryIds }
     }),
 
   addCountry: async (countryId: string) => {
