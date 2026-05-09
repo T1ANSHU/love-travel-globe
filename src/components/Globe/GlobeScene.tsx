@@ -1,5 +1,8 @@
 import { useEffect, useRef } from 'react'
 import Globe from 'globe.gl'
+import { feature } from 'topojson-client'
+import type { Topology, GeometryCollection } from 'topojson-specification'
+import worldDataRaw from 'world-atlas/countries-110m.json'
 import { CITIES, getCityById } from '../../data/cities'
 import { useGlobeStore } from '../../store/globeStore'
 import { usePhotoStore } from '../../store/photoStore'
@@ -21,6 +24,15 @@ const CITY_POINTS = CITIES.map((c) => ({
   nameEn: c.nameEn,
   countryId: c.countryId,
 }))
+
+// Country boundary GeoJSON features — converted once at module load from the
+// Natural Earth 110m TopoJSON bundled via world-atlas. Used for the static
+// country outline layer; does not interact with user place rendering.
+const WORLD_TOPO = worldDataRaw as unknown as Topology
+const COUNTRY_FEATURES = feature(
+  WORLD_TOPO,
+  WORLD_TOPO.objects.countries as GeometryCollection,
+).features
 
 interface ArcDatum {
   arcIndex: number
@@ -341,6 +353,16 @@ export function GlobeScene() {
       .htmlAltitude(0.04)
       .htmlElement(buildMinimalLabel)
       .htmlTransitionDuration(0)
+
+      // Stage 2: country-level boundary outlines — static, never changes.
+      // Near-invisible fill; soft rose-white stroke; no sides.
+      // City-level boundaries are deferred to Stage 3 (unlock glow).
+      .polygonsData(COUNTRY_FEATURES)
+      .polygonCapColor(() => 'rgba(255,255,255,0.02)')
+      .polygonSideColor(() => 'rgba(0,0,0,0)')
+      .polygonStrokeColor(() => 'rgba(255,200,215,0.18)')
+      .polygonAltitude(0.001)
+      .polygonsTransitionDuration(0)
 
       .arcsData([] as ArcDatum[])
       .arcStartLat('startLat')

@@ -20,6 +20,8 @@
     "react-hook-form": "^7.75.0",
     "react-router-dom": "^7.14.2",
     "three": "^0.184.0",
+    "topojson-client": "^3.1.0",
+    "world-atlas": "^2.0.2",
     "zod": "^4.4.3",
     "zustand": "^5.0.12"
   },
@@ -29,6 +31,7 @@
     "@types/node": "^24.12.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "@types/topojson-client": "^3.1.5",
     "@vitejs/plugin-react": "^6.0.1",
     "eslint": "^10.2.1",
     "eslint-plugin-react-hooks": "^7.1.1",
