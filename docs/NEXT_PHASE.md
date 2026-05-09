@@ -1,82 +1,68 @@
-# Project Status: Phase 6 + Global Place System Complete — Production Live
+# Project Status: Globe Redesign in Progress
 
-## Status
+## Current Active Work
 
-**Phase 6 is complete. The Global Place Location System (Geoapify) is complete. Both are live and verified in production.**
+**Globe Visualization Redesign** — replacing the old default-capital rendering model
+with a minimal, romantic, user-unlocked-only globe.
 
-All development phases (1 → 2 → 3 → 4 → 5 → 5.5 → 6 → Post-Launch) are finished and manually tested.
-Supabase Auth (Site URL + Redirect URLs) and Vercel environment variables are correctly configured.
-See `docs/PROJECT_PROGRESS.md` for the full history.
+Full plan: `docs/GLOBE_REDESIGN_PLAN.md`
 
----
+### Step 0 — Documentation ✅ Complete
+- `docs/GLOBE_REDESIGN_PLAN.md` created
+- `docs/globe-references/` folder created
+- `docs/NEXT_PHASE.md` and `docs/PROJECT_PROGRESS.md` updated
 
-## What Phase 6 delivered
+### Stage 1 — Stop default-capital rendering (Next)
 
-- **Step 1**: Dynamic photo tag filtering — FilterPanel chips from `photoStore.photos`; multi-select; null-safety
-- **Step 2**: City memory card — travel date range + photo count summary in city AlbumModal
-- **Step 3**: Vercel deployment — `vercel.json` SPA rewrite; env vars confirmed; production smoke test passed
+**What to implement:**
+1. Remove `CAPITAL_CITY_IDS` from `GlobeScene.tsx` rendering logic
+2. Remove `GLOBAL_LABELS` / `directCapitalLabels` / floating glass-card label system
+3. Simplify `recomputeVisible()`: visible = user-added + photo-tagged + geocoded only
+4. Globe initializes with `pointsData([])` and `htmlElementsData([])`
+5. Replace old floating glass-card label with minimal zoom-gated city name (altitude < 0.7)
+6. Remove `buildLabelElement` glass-card HTML; replace with lightweight text-only label
+7. Repurpose `LABEL_ALTITUDE_THRESHOLD` as `CITY_NAME_THRESHOLD ≈ 0.7`
+8. Run `npm run build` — TypeScript zero errors required
 
-## What the Post-Launch Global Place System delivered
+**What must NOT change:**
+- cities.ts / countries.ts static data (search, upload dropdown still use these)
+- placeStore capital lookup logic (uses `c.isCapital` field, not `CAPITAL_CITY_IDS`)
+- All user add/delete/search/fly-to behavior
+- Geoapify geocoded city rendering
+- Arc route replay, album modal, photo upload, auth
 
-- Geoapify geocoding API integrated — any city worldwide is now searchable and addable
-- Geocoded cities render on globe with marker + label, zoom-aware visibility
-- Persistence: 6 new columns on `user_places` (Migration M001 applied to production DB)
-- Delete, sidebar search, and fly-to all work for geocoded cities
-- See `docs/PROJECT_PROGRESS.md` → "Post-Launch Enhancement" section for full details
+### Stage 2 — Country boundaries (After Stage 1)
 
----
+**What to implement:**
+1. Download Natural Earth 110m GeoJSON → `src/data/world-countries-110m.geo.json`
+2. Static import in `GlobeScene.tsx`
+3. `globe.polygonsData(features)` with translucent fill + subtle white stroke
+4. Altitude-responsive opacity: full at high altitude, fades when zoomed into city level
 
-## Next major stage: UI / Animation / Audio Polish
-
-### ⚠️ Do NOT start writing UI or audio code yet
-
-The Polish phase must begin with **planning and reference gathering**, not code.
-Work through the steps below in order before asking Claude to implement anything.
-
----
-
-### Step 1 — Collect references first
-
-Find websites, design systems, Dribbble / Awwwards shots, and animation demos that match the target vibe:
-- Dreamy, romantic, pastel, glass-morphism, couples travel
-- Cartoon / illustrated globe styles
-- Fairy-tale character companions / mascots
-- Ethereal / sacred audio aesthetics
-
-Organise references into `docs/ui-references/` (see BACKLOG-02 for directory structure).
-
-### Step 2 — Create docs/UI_STYLE_GUIDE.md
-
-Before touching any component, write the visual language definition:
-- Primary palette (pink-200 → rose-600 range)
-- Typography scale, letter-spacing, font weights
-- Corner radius, shadow, blur, glow standards
-- Component extension rules (GlassCard, Button, AuthorCredit…)
-- Animation easing / duration vocabulary
-
-### Step 3 — Discuss each module against references
-
-Go through the backlog items one by one, confirm visual direction for each before any code:
-
-| Backlog | Module | Key decision needed |
-|---|---|---|
-| BACKLOG-01 | 首屏云雾拨开动画 + 上下滑动功能介绍页 | Animation library (CSS / Framer / GSAP / Lottie), cloud asset source |
-| BACKLOG-03 | 简约卡通地球模型重设计 | Tile source or custom texture, colour palette, border-line style |
-| BACKLOG-04 | 天书向导角色系统 | Character art direction, implementation format (SVG / Lottie / Canvas sprite) |
-| — | 登录 / 注册页美化 | Background treatment, card layout, input style |
-| — | Hover 照片预览动画 | Timing refinements, stacked-photo visual polish |
-| — | Achievement 解锁动画 | Toast design, centre-text typography polish |
-| — | 背景音乐和交互音效 | Asset sources (CC0), file format, audioService wiring |
-| — | 城市解锁神圣音效 + 天书说话音效 | Defer together until audioService is finalised |
-
-### Step 4 — Implement after design is confirmed
-
-Once references are collected and each module's direction is agreed, ask Claude Code to implement one module at a time in a dedicated session.
+### Stage 3 — Deferred to UI Polish
+- Globe texture swap (blue marble → cartoon/illustrated)
+- City unlock animation (ring pulse + beam/tyndall effect)
+- Per-city area glow polygon
+- Anchored city name final visual design
+- Coordinated unlock moment animation sequence
 
 ---
 
-## Hard constraints (always)
+## Previously Completed
 
-- Do NOT modify Auth, Supabase client, RLS policies, Storage bucket config, or database schema
-- Do NOT break any Phase 1–6 features
-- Do NOT start writing Polish code before the reference + style-guide steps above are done
+**Phase 6 + Global Place System (Production Live)**
+
+All development phases (1 → 2 → 3 → 4 → 5 → 5.5 → 6 → Post-Launch) complete and
+manually tested in production. See `docs/PROJECT_PROGRESS.md` for full history.
+
+- Phase 6: tag filtering, city memory card, Vercel deployment
+- Post-Launch: Geoapify geocoding, global city search, geocoded city persistence
+
+---
+
+## Hard Constraints (always)
+
+- Do NOT modify Auth, Supabase client, RLS policies, Storage bucket config, or DB schema
+- Do NOT break any Phase 1–6 features (auth, upload, albums, replay, search, Geoapify)
+- cities.ts / countries.ts static data must remain intact — search and dropdowns depend on it
+- Travel statistics must remain photo-only (StatsPanel reads from photoStore, not city data)

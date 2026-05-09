@@ -1,6 +1,6 @@
 # Project Progress
 
-Last updated: 2026-05-10 (Global Place Location System / Geoapify complete on main — UI Polish experiments on `ui-polish-experiments` branch)
+Last updated: 2026-05-10 (Globe Redesign planned — Step 0 documentation complete; Stage 1 implementation pending)
 
 ## Completed
 
@@ -292,6 +292,51 @@ Run in Supabase SQL Editor on any existing installation. Safe to re-run (`IF NOT
 **Not yet done:**
 - Not merged to main
 - Not deployed to production
+
+## Globe Visualization Redesign — In Progress
+
+> Plan finalized. Step 0 (documentation) complete. Code implementation not yet started.
+> Full plan: `docs/GLOBE_REDESIGN_PLAN.md`
+
+### Product Direction Change
+
+The globe rendering model is being redesigned from a "world reference map with default capitals"
+to a "minimal romantic personal travel artifact":
+
+- **Old model**: All country capitals visible by default as reference points + labels
+- **New model**: Only user-unlocked cities visible; clean empty globe until user adds places
+
+### Step 0 — Documentation ✅ Complete (2026-05-10)
+
+- `docs/GLOBE_REDESIGN_PLAN.md` created — full 3-stage plan
+- `docs/globe-references/` folder created for visual reference assets
+- `docs/NEXT_PHASE.md` updated
+- 40 capital cities added to `cities.ts` in previous session remain — they serve
+  search and upload dropdowns but will NOT render on globe until user explicitly adds them
+
+### Stage 1 — Stop Default-Capital Rendering (Pending)
+
+Planned changes to `GlobeScene.tsx`:
+- Remove `CAPITAL_CITY_IDS` rendering logic
+- Remove `GLOBAL_LABELS` / `directCapitalLabels` floating label system
+- Simplify `recomputeVisible()`: user-added + photo cities + geocoded only
+- Replace floating glass-card HTML label with lightweight zoom-gated text label
+- `npm run build` must pass
+
+### Stage 2 — Country Boundaries (After Stage 1)
+
+Planned:
+- Natural Earth 110m GeoJSON → `src/data/world-countries-110m.geo.json` (static import)
+- `globe.polygonsData()` with translucent fill + subtle white stroke
+
+### Stage 3 — Deferred to UI Polish
+
+- Globe texture swap (cartoon/illustrated)
+- City unlock animation (ring pulse + beam effect)
+- Per-city area glow polygon
+- Anchored city name final design
+
+---
 
 ## Not Started
 
