@@ -98,6 +98,10 @@ let replayCurrentCityId = ''     // '' = not playing
 let currentAltitude = 2.4
 // Below this altitude city name labels become visible (city-level zoom)
 const CITY_NAME_THRESHOLD = 0.7
+// Geographic offset for city name labels — placed this many degrees north of the
+// actual marker so the text sits on map area north of the dot rather than on top.
+// Final on-map typography will be revisited during cartoon globe / UI polish stage.
+const LABEL_LAT_OFFSET = 0.6
 
 // ── Callback functions at module level ───────────────────────────────────────
 
@@ -227,16 +231,17 @@ function recomputeVisible() {
     return
   }
 
+  // Labels anchored slightly north of the marker (geographic offset, not pixel offset)
   const staticLabels = CITY_POINTS.filter((c) => visible.has(c.id)).map((c) => ({
-    id: c.id,
-    lat: c.lat,
+    id: `${c.id}__label`,
+    lat: c.lat + LABEL_LAT_OFFSET,
     lng: c.lng,
     name: c.name,
   }))
 
   const geocodedLabels = [...geocodedPlaces.values()].map((p) => ({
-    id: p.id,
-    lat: p.lat,
+    id: `${p.id}__label`,
+    lat: p.lat + LABEL_LAT_OFFSET,
     lng: p.lng,
     name: p.displayName,
   }))
@@ -244,9 +249,9 @@ function recomputeVisible() {
   g.htmlElementsData([...staticLabels, ...geocodedLabels])
 }
 
-// Zoom-gated city name label — minimal, surface-level, offset beside the marker.
-// Positioned to the right so the space directly above the dot stays clear for the
-// future landmark model that will emerge there in a later stage.
+// Zoom-gated city name label — anchored to a geographic point slightly north of the
+// marker dot. The geographic offset (LABEL_LAT_OFFSET) does the separation work;
+// this transform just centers the element on its own anchor position.
 // Click/hover handled by the marker dot (onPointHover / onPointClick).
 function buildMinimalLabel(d: object): HTMLElement {
   const item = d as { name: string }
@@ -255,8 +260,7 @@ function buildMinimalLabel(d: object): HTMLElement {
     'pointer-events: none',
     'user-select: none',
     'white-space: nowrap',
-    // Offset to the right of the marker center, vertically centered on it
-    'transform: translate(13px, -50%)',
+    'transform: translate(-50%, -50%)',
   ].join(';')
   wrapper.innerHTML = `<span style="
     display: inline-block;
