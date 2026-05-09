@@ -7,6 +7,9 @@
  * - Replaced @/lib/utils cn() with inline class join
  * - NodeJS.Timeout → ReturnType<typeof setTimeout>
  * - Added ParticlesBackground convenience wrapper with dreamy-pink defaults
+ * - Added glow prop (canvas shadowBlur) for soft particle glow
+ * - Improved targetAlpha range (0.35–0.75) and continuous size distribution
+ * - Added MouseGlow cursor-follow radial gradient layer
  */
 
 import React, {
@@ -26,6 +29,20 @@ function useMousePosition(): { x: number; y: number } {
     return () => window.removeEventListener('mousemove', handler)
   }, [])
   return pos
+}
+
+// Subtle radial glow that trails the cursor
+function MouseGlow() {
+  const { x, y } = useMousePosition()
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none fixed inset-0 z-0"
+      style={{
+        background: `radial-gradient(circle 220px at ${x}px ${y}px, rgba(251, 113, 133, 0.14), transparent 70%)`,
+      }}
+    />
+  )
 }
 
 function hexToRgb(hex: string): number[] {
@@ -56,6 +73,7 @@ interface ParticlesProps extends ComponentPropsWithoutRef<'div'> {
   color?: string
   vx?: number
   vy?: number
+  glow?: number   // canvas shadowBlur radius; 0 = disabled
 }
 
 // ── Core Particles component ───────────────────────────────────────────────
@@ -70,6 +88,7 @@ export const Particles: React.FC<ParticlesProps> = ({
   color = '#ffffff',
   vx = 0,
   vy = 0,
+  glow = 0,
   ...props
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -135,9 +154,11 @@ export const Particles: React.FC<ParticlesProps> = ({
     y: Math.floor(Math.random() * canvasSize.current.h),
     translateX: 0,
     translateY: 0,
-    size: Math.floor(Math.random() * 2) + size,
+    // continuous distribution so all sizes from `size` to `size+1.6` appear
+    size: Math.random() * 1.6 + size,
     alpha: 0,
-    targetAlpha: parseFloat((Math.random() * 0.6 + 0.1).toFixed(1)),
+    // raised floor so no particle is too faint to see
+    targetAlpha: parseFloat((Math.random() * 0.4 + 0.35).toFixed(2)),
     dx: (Math.random() - 0.5) * 0.1,
     dy: (Math.random() - 0.5) * 0.1,
     magnetism: 0.1 + Math.random() * 4,
@@ -150,8 +171,15 @@ export const Particles: React.FC<ParticlesProps> = ({
     ctx.current.translate(c.translateX, c.translateY)
     ctx.current.beginPath()
     ctx.current.arc(c.x, c.y, c.size, 0, 2 * Math.PI)
+    if (glow > 0) {
+      ctx.current.shadowBlur = glow
+      ctx.current.shadowColor = `rgba(${rgb.join(', ')}, ${c.alpha})`
+    }
     ctx.current.fillStyle = `rgba(${rgb.join(', ')}, ${c.alpha})`
     ctx.current.fill()
+    if (glow > 0) {
+      ctx.current.shadowBlur = 0
+    }
     ctx.current.setTransform(dpr, 0, 0, dpr, 0, 0)
     if (!update) circles.current.push(c)
   }
@@ -227,32 +255,46 @@ export const Particles: React.FC<ParticlesProps> = ({
   )
 }
 
-// ── ParticlesBackground — two-layer dreamy pink auth background ───────────
+// ── ParticlesBackground — three-layer dreamy pink auth background ─────────
 //
-// Layer A (rose): larger, fewer — the visible romantic "stars"
-// Layer B (white): smaller, more — the fine dreamy shimmer behind them
+// Layer A (rose-400): main glow particles — the romantic visible "stars"
+// Layer B (pink-200): soft pink mid-layer — dreamy fill
+// Layer C (white):    sharp sparkle dots — add starfield depth
+// MouseGlow:          cursor-follow radial gradient — makes interaction obvious
 //
-// To tune without touching core Particles logic, adjust the constants below:
+// Tune here without touching core Particles logic:
 
 const LAYER_A = {
-  quantity:  80,          // rose-pink dots — main visible layer
-  color:    '#f9a8d4',   // pink-300 (soft rose)
-  size:      1.4,         // base radius px — actual range 1.4 – 3.4 px
-  staticity: 70,
-  ease:      85,
+  quantity:  75,          // rose dots — primary visible layer
+  color:    '#fb7185',   // rose-400: warmer, clearly visible on pink bg
+  size:      1.8,         // base radius — continuous range 1.8 – 3.4 px
+  staticity: 35,          // low = strong mouse pull
+  ease:      55,          // low = fast convergence to cursor
+  glow:      12,          // canvas shadowBlur for soft halo
 }
 
 const LAYER_B = {
-  quantity:  55,          // white shimmer — secondary layer
+  quantity:  55,          // pink-200 fill layer
+  color:    '#fbcfe8',   // pink-200: softer than rose, good contrast on bg
+  size:      1.2,         // range 1.2 – 2.8 px
+  staticity: 55,
+  ease:      75,
+  glow:      6,
+}
+
+const LAYER_C = {
+  quantity:  35,          // white sparkle accent layer
   color:    '#ffffff',
-  size:      0.9,         // smaller than layer A
-  staticity: 60,
-  ease:      90,
+  size:      0.7,         // range 0.7 – 2.3 px
+  staticity: 65,
+  ease:      85,
+  glow:      3,
 }
 
 export function ParticlesBackground() {
   return (
     <>
+      <MouseGlow />
       <Particles
         className="fixed inset-0 z-0"
         quantity={LAYER_A.quantity}
@@ -260,6 +302,7 @@ export function ParticlesBackground() {
         size={LAYER_A.size}
         staticity={LAYER_A.staticity}
         ease={LAYER_A.ease}
+        glow={LAYER_A.glow}
       />
       <Particles
         className="fixed inset-0 z-0"
@@ -268,6 +311,16 @@ export function ParticlesBackground() {
         size={LAYER_B.size}
         staticity={LAYER_B.staticity}
         ease={LAYER_B.ease}
+        glow={LAYER_B.glow}
+      />
+      <Particles
+        className="fixed inset-0 z-0"
+        quantity={LAYER_C.quantity}
+        color={LAYER_C.color}
+        size={LAYER_C.size}
+        staticity={LAYER_C.staticity}
+        ease={LAYER_C.ease}
+        glow={LAYER_C.glow}
       />
     </>
   )
