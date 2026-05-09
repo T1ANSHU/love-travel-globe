@@ -76,7 +76,8 @@ The globe logic is now stable. Recommended options in priority order:
 
 ### Option A — Production Regression Test (Recommended First)
 Run a full manual smoke test in production to confirm that Stages 1–2 did not
-break any Phase 1–6 features. Key flows to verify:
+break any Phase 1–6 features. Checklist: `docs/PRODUCTION_REGRESSION_CHECKLIST.md`.
+Key flows to verify:
 - Auth (login / register / logout)
 - Photo upload, album view, delete photo
 - Add city (local + Geoapify), delete city
@@ -91,12 +92,17 @@ Address known minor gaps before UI Polish:
 - Sidebar search cap (max 8 results) may be too low for Chinese city searches
 - `place_cache` table for Geoapify results not yet implemented
 
-### Option C — Next Feature Planning
-After regression test and any critical cleanup, plan one of:
-- Place achievement system (unlock tiers, milestones)
-- Advanced statistics (distance flown, heatmap, travel frequency)
-- Multi-user / sharing features (currently photos are private-only)
-- These should only begin after the current globe logic is confirmed stable in production
+### Option C — Emotional Feature Enhancements (Phase 7)
+After regression test and any critical cleanup:
+- **7.1 City Favorites** — mark cities as favorites; no schema migration risk; recommended first
+- **7.2 Travel Story (template)** — auto-generate narrative from existing photo/route data; no external API needed for MVP
+- **7.3 Playback Upgrade** — improve ReplayPanel with photo previews and date overlays
+Full roadmap: `docs/FUTURE_ROADMAP.md`
+
+### Option D — Globe Stage 3 Visual Polish (Phase 9)
+- Cartoon globe texture, city unlock animation (ring pulse + beam), per-city glow polygon
+- Deferred items: `docs/GLOBE_VISUAL_BACKLOG.md`
+- Do not start until Option A regression test is complete
 
 ---
 

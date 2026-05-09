@@ -85,3 +85,10 @@ The Stage 1 city name label is a temporary bridge (plain text, no card, beside t
 - Real-time data feeds
 - Heatmap layer
 - 3D extruded buildings
+
+---
+
+## Roadmap Context
+
+Stage 3 items are part of **Phase 9: UI / Animation / Audio Polish** in the full future roadmap.
+See `docs/FUTURE_ROADMAP.md` for the complete Phase 7–10 plan and implementation priority order.

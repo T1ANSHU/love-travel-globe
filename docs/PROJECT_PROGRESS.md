@@ -347,3 +347,29 @@ The following are intentionally deferred. See `docs/GLOBE_VISUAL_BACKLOG.md` for
 
 - **Audio Polish**: city/country unlock sound effect — sacred, ethereal, soft chime, magical, calm, dreamy; should play in sync with achievement animation; deferred until `MusicPanel` / `audioService` / audio asset management are finalised
 - Remaining UI Polish modules (see `docs/UI_POLISH_PLAN.md` and `docs/UI_POLISH_BACKLOG.md`)
+
+---
+
+## Planned Future Phases
+
+Full roadmap: `docs/FUTURE_ROADMAP.md`
+
+### Phase 7 — Emotional Feature Enhancements (planned)
+- **7.1 City Favorites**: mark a city as favorite; highlighted in album/sidebar; does not affect city count; no schema migration risk — recommended next feature
+- **7.2 Auto-generated Travel Story**: deterministic template narrative from route + dates + photos; AI narrative (Claude API) considered for later iteration
+- **7.3 Memory Playback Upgrade**: improve ReplayPanel with photo previews, dates, city overlays, and smoother globe transitions; heavy animation deferred to Phase 9
+
+### Phase 8 — Collaboration and Sharing (planned, not yet scoped)
+- **8.1 Couple / Dual-user Collaborative Account**: two users contribute to a shared globe; requires major Supabase RLS + schema redesign; do not start until single-user model is proven stable
+- **8.2 Public Sharing Mode**: read-only public globe via share link; `share_token` on user profile; separate read-only React route; lower RLS complexity than 8.1
+
+### Phase 9 — UI / Animation / Audio Polish (partially in progress on `ui-polish-experiments`)
+- Globe Stage 3: cartoon texture, city unlock animation (ring pulse + Tyndall beam), per-city glow polygon, landmark 3D model pop-up, elegant on-map typography
+- Auth / landing page beautification
+- Tianshu guide character / onboarding companion
+- Unlock sound effect and full audio polish
+
+### Phase 10 — Production Launch Readiness (planned)
+- Multi-user data isolation audit, Supabase RLS review, Storage permission review
+- Full production regression test
+- Real user onboarding, feedback collection, post-launch iteration
