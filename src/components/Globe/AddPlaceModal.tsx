@@ -1,9 +1,11 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { COUNTRIES } from '../../data/countries'
 import { CITIES } from '../../data/cities'
 import { GlassCard } from '../UI/GlassCard'
 import { usePlaceStore } from '../../store/placeStore'
+import { resolvePlace } from '../../services/placeResolver'
+import type { PlaceResult } from '../../types/place'
 import type { AchievementPlace } from './PlaceAchievement'
 
 interface AddPlaceModalProps {
@@ -33,6 +35,8 @@ export function AddPlaceModal({ onClose, onPlaceAdded }: AddPlaceModalProps) {
   const [query, setQuery] = useState('')
   const [adding, setAdding] = useState<string | null>(null)
   const [justAdded, setJustAdded] = useState<Set<string>>(new Set())
+  // Resolver hint shown only when the direct search finds nothing
+  const [resolverHint, setResolverHint] = useState<PlaceResult | null>(null)
 
   const addCity = usePlaceStore((s) => s.addCity)
   const addCountry = usePlaceStore((s) => s.addCountry)
@@ -44,6 +48,7 @@ export function AddPlaceModal({ onClose, onPlaceAdded }: AddPlaceModalProps) {
     [],
   )
 
+  // Direct multi-result search across local CITIES + COUNTRIES (unchanged behavior)
   const results = useMemo<SearchResult[]>(() => {
     const q = query.trim().toLowerCase()
     if (!q) return []
@@ -78,16 +83,42 @@ export function AddPlaceModal({ onClose, onPlaceAdded }: AddPlaceModalProps) {
     return out.slice(0, 20)
   }, [query, countryNameMap])
 
+  // When direct search finds nothing, ask placeResolver for an informative hint.
+  // Local resolution is O(1) so this is effectively instant for local data.
+  // When Step 2 (Geoapify) is added, this is where external lookup will also kick in.
+  useEffect(() => {
+    const q = query.trim()
+    if (!q || results.length > 0) {
+      setResolverHint(null)
+      return
+    }
+    let alive = true
+    resolvePlace(q).then((r) => {
+      if (alive) setResolverHint(r)
+    })
+    return () => { alive = false }
+  }, [query, results.length])
+
   const handleAdd = async (result: SearchResult) => {
     const key = `${result.kind}:${result.id}`
     setAdding(key)
     try {
+      // Resolve through placeResolver to normalize data and validate.
+      // For local data this is O(1); when Geoapify is added in Step 2
+      // the resolver will supply lat/lng and canonical IDs from the API.
+      const resolved = await resolvePlace(result.id)
+      if (!resolved.found) {
+        // Defensive: shouldn't happen for items from the local search
+        return
+      }
+
       let res: { ok: true } | { error: string }
       if (result.kind === 'city') {
-        res = await addCity(result.id, result.countryId)
+        res = await addCity(resolved.cityId ?? result.id, resolved.countryId)
       } else {
-        res = await addCountry(result.id)
+        res = await addCountry(resolved.countryId)
       }
+
       if ('ok' in res) {
         setJustAdded((prev) => new Set([...prev, key]))
         // Close modal immediately on success so the achievement animation is unobstructed.
@@ -98,17 +129,13 @@ export function AddPlaceModal({ onClose, onPlaceAdded }: AddPlaceModalProps) {
           if (result.kind === 'city') {
             onPlaceAdded({
               kind: 'city',
-              name: result.name,
-              countryName: result.countryName,
-              isCapital: result.isCapital,
+              name: resolved.displayName,
+              countryName: resolved.countryName,
+              isCapital: resolved.isCapital,
             })
           } else {
-            const capital = CITIES.find((c) => c.countryId === result.id && c.isCapital)
-            onPlaceAdded({
-              kind: 'country',
-              name: result.name,
-              capitalName: capital?.name,
-            })
+            const capital = CITIES.find((c) => c.countryId === resolved.countryId && c.isCapital)
+            onPlaceAdded({ kind: 'country', name: resolved.displayName, capitalName: capital?.name })
           }
         }
       }
@@ -174,11 +201,7 @@ export function AddPlaceModal({ onClose, onPlaceAdded }: AddPlaceModalProps) {
               <p className="text-xs text-pink-400 text-center py-8">
                 输入城市或国家名称进行搜索 🔍
               </p>
-            ) : results.length === 0 ? (
-              <p className="text-xs text-pink-400 text-center py-8">
-                没有找到匹配的城市或国家
-              </p>
-            ) : (
+            ) : results.length > 0 ? (
               <ul className="space-y-2">
                 {results.map((r) => {
                   const key = `${r.kind}:${r.id}`
@@ -224,6 +247,27 @@ export function AddPlaceModal({ onClose, onPlaceAdded }: AddPlaceModalProps) {
                   )
                 })}
               </ul>
+            ) : resolverHint?.found ? (
+              // Resolver found something (likely a landmark) but it can't be added directly
+              <div className="py-8 text-center space-y-1.5">
+                <p className="text-sm font-semibold text-pink-700">
+                  {resolverHint.displayName}
+                  <span className="ml-1.5 text-[10px] font-normal text-pink-400">
+                    {resolverHint.displayNameEn}
+                  </span>
+                </p>
+                <p className="text-[10px] text-pink-400">{resolverHint.countryName}</p>
+                <p className="mt-2 text-xs text-amber-600">
+                  {resolverHint.type === 'landmark'
+                    ? '已找到该地标，暂不支持直接添加。请搜索所在城市进行添加。'
+                    : '该地点暂不支持直接添加。'}
+                </p>
+              </div>
+            ) : (
+              // Not found in any local dataset — show resolver message
+              <p className="text-xs text-pink-400 text-center py-8">
+                {resolverHint?.message ?? '没有找到匹配的城市或国家'}
+              </p>
             )}
           </div>
 
