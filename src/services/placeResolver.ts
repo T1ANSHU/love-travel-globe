@@ -7,15 +7,25 @@
  *     Searches CITIES / COUNTRIES / LANDMARKS by id, zh name, en name.
  *     Synchronous, zero network, instant response.
  *
- *   Step 2 — GeoapifyResolver (future, not yet added)
- *     POST query → https://api.geoapify.com/v1/geocode/search
- *     Return normalized ResolvedPlace with source: 'geocoding_api'.
- *     Recommended over OpenCage: better free tier (3,000 req/day vs 2,500),
- *     cleaner city/country disambiguation, good Chinese name support.
+ *   Step 2 — GeoapifyResolver (stub ready, not yet wired)
+ *     File: src/services/geocoding/geoapifyResolver.ts
+ *     To enable: set VITE_GEOAPIFY_API_KEY, uncomment the fetch block in the
+ *     stub, then uncomment the line in the chain array below.
+ *     Env var: VITE_GEOAPIFY_API_KEY (browser-safe; set Referrer restriction in dashboard)
  *
  *   Step 3 — SupabaseCacheResolver (future, not yet added)
- *     Check place_cache table first; write-through on every new API hit.
- *     Requires: CREATE TABLE place_cache (query TEXT PRIMARY KEY, result JSONB, resolved_at TIMESTAMPTZ);
+ *     Check place_cache table first; write-through on every new Geoapify hit.
+ *     SQL (do not apply yet):
+ *       CREATE TABLE place_cache (
+ *         query_normalized  TEXT PRIMARY KEY,
+ *         result            JSONB NOT NULL,
+ *         provider          TEXT NOT NULL,
+ *         resolved_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+ *         expires_at        TIMESTAMPTZ
+ *       );
+ *       ALTER TABLE place_cache ENABLE ROW LEVEL SECURITY;
+ *       CREATE POLICY "place_cache_select" ON place_cache FOR SELECT TO authenticated USING (true);
+ *       CREATE POLICY "place_cache_insert" ON place_cache FOR INSERT TO authenticated WITH CHECK (true);
  *
  * To add a new resolver, implement IPlaceResolver and append to the chain array
  * at the bottom of this file — no other code needs to change.
@@ -182,8 +192,10 @@ class PlaceResolverChain implements IPlaceResolver {
 
 const _chain = new PlaceResolverChain([
   new LocalPlaceResolver(),
-  // new GeoapifyResolver(import.meta.env.VITE_GEOAPIFY_KEY),   // Step 2 — plug in here
-  // new SupabaseCacheResolver(),                                // Step 3 — plug in here
+  // Step 2: import { GeoapifyResolver } from './geocoding/geoapifyResolver'
+  // then uncomment ↓ (also uncomment the fetch block inside GeoapifyResolver.resolve)
+  // new GeoapifyResolver(import.meta.env.VITE_GEOAPIFY_API_KEY ?? ''),
+  // Step 3: new SupabaseCacheResolver(),
 ])
 
 /**
