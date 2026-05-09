@@ -11,6 +11,7 @@ import { useGlobeStore } from '../store/globeStore'
 import { useUserPhotos } from '../hooks/useUserPhotos'
 import { useUserPlaces } from '../hooks/useUserPlaces'
 import { useSettings } from '../hooks/useSettings'
+import { CoupleStoryPanel } from '../components/CoupleStory/CoupleStoryPanel'
 
 export function GlobePage() {
   const [introComplete, setIntroComplete] = useState(false)
@@ -61,6 +62,9 @@ export function GlobePage() {
 
       {/* City hover preview overlay — sibling of GlobeScene, not a child */}
       <CityHoverPreview />
+
+      {/* Couple story panel — left side */}
+      <CoupleStoryPanel />
 
       {/* Sidebar */}
       <Sidebar />
