@@ -1,6 +1,6 @@
 # Globe Visual Concept — Authoritative Rule Set
 
-**Status**: Active — governs all Stage 1, 2, 3 implementation decisions
+**Status**: Active — Stages 1 and 2 implemented; Stage 3 deferred to UI Polish
 **Last updated**: 2026-05-10
 
 This document defines what the globe must look and feel like. It takes precedence over any earlier notes or experimental ideas.

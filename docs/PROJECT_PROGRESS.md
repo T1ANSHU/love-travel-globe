@@ -1,6 +1,6 @@
 # Project Progress
 
-Last updated: 2026-05-10 (Globe Redesign planned — Step 0 documentation complete; Stage 1 implementation pending)
+Last updated: 2026-05-10 (Globe Redesign Stages 1, 1.1, 2 complete — Stage 3 deferred to UI Polish)
 
 ## Completed
 
@@ -293,48 +293,53 @@ Run in Supabase SQL Editor on any existing installation. Safe to re-run (`IF NOT
 - Not merged to main
 - Not deployed to production
 
-## Globe Visualization Redesign — In Progress
+## Globe Visualization Redesign — ✅ Stages 1–2 Complete (2026-05-10)
 
-> Plan finalized. Step 0 (documentation) complete. Code implementation not yet started.
 > Full plan: `docs/GLOBE_REDESIGN_PLAN.md`
+> Visual concept: `docs/GLOBE_VISUAL_CONCEPT.md`
+> Stage 3 backlog: `docs/GLOBE_VISUAL_BACKLOG.md`
 
-### Product Direction Change
+### Product Direction
 
-The globe rendering model is being redesigned from a "world reference map with default capitals"
-to a "minimal romantic personal travel artifact":
+Globe redesigned from "world reference map with default capitals" to
+"minimal romantic personal travel artifact — only user-unlocked places render."
 
-- **Old model**: All country capitals visible by default as reference points + labels
-- **New model**: Only user-unlocked cities visible; clean empty globe until user adds places
+### Step 0 — Documentation ✅ Complete
+- `GLOBE_REDESIGN_PLAN.md`, `GLOBE_VISUAL_CONCEPT.md`, `GLOBE_VISUAL_BACKLOG.md` created
+- `docs/globe-references/` folder created
 
-### Step 0 — Documentation ✅ Complete (2026-05-10)
+### Stage 1 — Stop Default-Capital Rendering ✅ Complete
+- `CAPITAL_CITY_IDS` and `GLOBAL_LABELS` constants removed from `GlobeScene.tsx`
+- `recomputeVisible()` now builds visible set from user data only (no default capitals)
+- `buildLabelElement` glass-card HTML replaced with minimal `buildMinimalLabel` (text-only)
+- Globe initializes empty: `pointsData([])` and `htmlElementsData([])`
+- `CITY_NAME_THRESHOLD = 0.7` replaces old `LABEL_ALTITUDE_THRESHOLD = 1.5`
+- Static `cities.ts` / `countries.ts` unchanged — search and dropdowns unaffected
 
-- `docs/GLOBE_REDESIGN_PLAN.md` created — full 3-stage plan
-- `docs/globe-references/` folder created for visual reference assets
-- `docs/NEXT_PHASE.md` updated
-- 40 capital cities added to `cities.ts` in previous session remain — they serve
-  search and upload dropdowns but will NOT render on globe until user explicitly adds them
+### Stage 1.1 — Marker + Label Visual Refinement ✅ Complete
+- Marker radius scales with altitude: `altScale = clamp(altitude/1.5, 0.28, 1.0)`
+- `globe.pointRadius()` re-evaluated on every zoom tick for smooth continuous scaling
+- City name labels anchored to `lat + 0.6°` north of the marker (geographic offset)
+- Label transform: `translate(-50%, -50%)` — centered on its own geographic anchor point
+- Label style: warm rose text, subtle near-transparent pill background, wide letter spacing
 
-### Stage 1 — Stop Default-Capital Rendering (Pending)
+### Stage 2 — Country Boundary Layer ✅ Complete
+- `world-atlas@2.0.2` + `topojson-client@3.1.0` installed
+- `resolveJsonModule: true` added to `tsconfig.app.json`
+- `COUNTRY_FEATURES`: Natural Earth 110m TopoJSON → GeoJSON, computed once at module load
+- `globe.polygonsData(COUNTRY_FEATURES)` with subtle rose-white stroke (`rgba(255,200,215,0.18)`)
+- Boundary layer is static, independent of user place rendering
+- Unadded cities still render nothing — boundary layer carries no city data
 
-Planned changes to `GlobeScene.tsx`:
-- Remove `CAPITAL_CITY_IDS` rendering logic
-- Remove `GLOBAL_LABELS` / `directCapitalLabels` floating label system
-- Simplify `recomputeVisible()`: user-added + photo cities + geocoded only
-- Replace floating glass-card HTML label with lightweight zoom-gated text label
-- `npm run build` must pass
+### Stage 3 — Deferred to UI Polish (not yet started)
 
-### Stage 2 — Country Boundaries (After Stage 1)
-
-Planned:
-- Natural Earth 110m GeoJSON → `src/data/world-countries-110m.geo.json` (static import)
-- `globe.polygonsData()` with translucent fill + subtle white stroke
-
-### Stage 3 — Deferred to UI Polish
-
-- Globe texture swap (cartoon/illustrated)
-- City unlock animation (ring pulse + beam effect)
-- Per-city area glow polygon
-- Anchored city name final design
+The following are intentionally deferred. See `docs/GLOBE_VISUAL_BACKLOG.md` for detail:
+- Cartoon / illustrated globe texture (replace blue marble)
+- City unlock animation (ring pulse + Tyndall beam effect)
+- Per-city area glow / boundary polygon (on-demand after unlock)
+- Landmark / mini 3D model pop-up from marker when zoomed in
+- Final elegant on-map city name typography
+- Unlock sound effect (sacred, ethereal, soft chime)
 
 ---
 

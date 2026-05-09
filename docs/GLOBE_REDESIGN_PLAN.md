@@ -1,6 +1,6 @@
 # Globe Visualization Redesign Plan
 
-**Status**: Step 0 complete (documentation) — Stage 1 implementation pending
+**Status**: Stage 1, 1.1, and Stage 2 complete — Stage 3 deferred to UI Polish
 **Last updated**: 2026-05-10
 **Branch**: main
 
@@ -172,6 +172,17 @@ docs/
 ## Implementation Checklist
 
 - [x] Step 0: Documentation + folders created
-- [ ] Stage 1: Remove default-capital rendering; minimal zoom-gated city name
-- [ ] Stage 2: Country-level boundary GeoJSON + polygonsData (country scope only)
-- [ ] Stage 3: Unlock animation, city glow, per-city boundary, cartoon texture (UI Polish)
+- [x] Stage 1: Remove default-capital rendering; minimal zoom-gated city name
+- [x] Stage 1.1: Zoom-aware marker radius; city name geographically offset north of marker
+- [x] Stage 2: Country-level boundary GeoJSON + polygonsData (country scope only)
+- [ ] Stage 3: Unlock animation, city glow, per-city boundary, cartoon texture (UI Polish — deferred)
+
+## Stage 3 Deferred Items (do not implement until UI Polish phase)
+
+- Cartoon / illustrated globe texture (replace blue marble satellite image)
+- City unlock animation: ring pulse + Tyndall-like beam effect
+- Per-city area boundary polygon (loaded on demand after unlock)
+- City area glow / highlight for unlocked cities
+- Landmark / mini 3D model pop-up from marker when zoomed in
+- Final elegant on-map typography (replace temporary north-offset text label)
+- Unlock sound effect (sacred, ethereal, soft chime — deferred with audio polish)
