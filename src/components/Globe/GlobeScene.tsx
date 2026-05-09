@@ -219,10 +219,23 @@ function recomputeVisible() {
 
   g.pointsData([...CITY_POINTS.filter((c) => visible.has(c.id)), ...geocodedPoints])
 
-  // Capital labels: always visible regardless of zoom
+  // Capital labels sourced from global-level landmarks (existing capitals with landmark entries)
   const capitalLabels = GLOBAL_LABELS.filter(
     (l) => l.cityId && CAPITAL_CITY_IDS.has(l.cityId) && visible.has(l.cityId),
   )
+
+  // Capitals that have no global landmark entry — generate label directly from city data
+  const landmarkCoveredIds = new Set(capitalLabels.map((l) => l.cityId!))
+  const directCapitalLabels = CITY_POINTS.filter(
+    (c) => CAPITAL_CITY_IDS.has(c.id) && visible.has(c.id) && !landmarkCoveredIds.has(c.id),
+  ).map((c) => ({
+    id: c.id,
+    lat: c.lat,
+    lng: c.lng,
+    name: c.name,
+    cityId: c.id,
+    countryId: c.countryId,
+  }))
 
   const zoomed = currentAltitude < LABEL_ALTITUDE_THRESHOLD
 
@@ -245,7 +258,7 @@ function recomputeVisible() {
       countryId: p.countryId,
     }))
 
-  g.htmlElementsData([...capitalLabels, ...nonCapitalLabels, ...geocodedLabels])
+  g.htmlElementsData([...capitalLabels, ...directCapitalLabels, ...nonCapitalLabels, ...geocodedLabels])
 }
 
 function buildLabelElement(d: object): HTMLElement {
