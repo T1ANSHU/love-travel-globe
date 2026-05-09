@@ -36,6 +36,7 @@ import type { BaseCity, BaseCountry, BaseLandmark } from '../types/travel'
 import { CITIES } from '../data/cities'
 import { COUNTRIES } from '../data/countries'
 import { LANDMARKS } from '../data/landmarks'
+import { GeoapifyResolver } from './geocoding/geoapifyResolver'
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 
@@ -190,11 +191,11 @@ class PlaceResolverChain implements IPlaceResolver {
 
 // ── Singleton + public API ────────────────────────────────────────────────────
 
+const _geoapify = new GeoapifyResolver(import.meta.env.VITE_GEOAPIFY_API_KEY ?? '')
+
 const _chain = new PlaceResolverChain([
   new LocalPlaceResolver(),
-  // Step 2: import { GeoapifyResolver } from './geocoding/geoapifyResolver'
-  // then uncomment ↓ (also uncomment the fetch block inside GeoapifyResolver.resolve)
-  // new GeoapifyResolver(import.meta.env.VITE_GEOAPIFY_API_KEY ?? ''),
+  _geoapify,
   // Step 3: new SupabaseCacheResolver(),
 ])
 
@@ -209,6 +210,15 @@ const _chain = new PlaceResolverChain([
  */
 export async function resolvePlace(query: string): Promise<PlaceResult> {
   return _chain.resolve(query)
+}
+
+/**
+ * Returns up to 5 Geoapify candidates for a free-text query.
+ * Used by AddPlaceModal to show a selectable list when local search finds nothing.
+ * Returns [] when the API key is absent or the query fails.
+ */
+export async function resolvePlaceCandidates(query: string): Promise<ResolvedPlace[]> {
+  return _geoapify.resolveMany(query)
 }
 
 /**

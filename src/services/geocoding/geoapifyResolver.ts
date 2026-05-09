@@ -55,17 +55,16 @@ export interface GeoapifyResponse {
   features: GeoapifyFeature[]
 }
 
-// ── Resolver stub ─────────────────────────────────────────────────────────────
+// ── Resolver ──────────────────────────────────────────────────────────────────
 
 const UNSUPPORTED_MESSAGE = '当前地点暂未收录，后续将支持全球城市自动定位。'
 
-/**
- * Implements IPlaceResolver using the Geoapify Geocoding API.
- *
- * Current state: STUB — resolve() always returns UnsupportedPlace.
- * When Step 3 is confirmed, replace the stub body with the implementation block
- * below and wire this class into PlaceResolverChain in placeResolver.ts.
- */
+// result_type values we consider meaningful place results (exclude street, postcode, amenity)
+const VALID_TYPES = new Set(['city', 'county', 'state', 'country'])
+
+const GEO_API = 'https://api.geoapify.com/v1/geocode/search'
+
+/** Implements IPlaceResolver using the Geoapify Geocoding API. */
 export class GeoapifyResolver implements IPlaceResolver {
   private readonly apiKey: string
 
@@ -73,41 +72,39 @@ export class GeoapifyResolver implements IPlaceResolver {
     this.apiKey = apiKey
   }
 
+  /** Returns up to `limit` place candidates from Geoapify. Empty array on any error or missing key. */
+  async resolveMany(query: string, limit = 5): Promise<ResolvedPlace[]> {
+    const q = query.trim()
+    if (!q || !this.apiKey) return []
+
+    const params = new URLSearchParams({
+      text: q,
+      lang: 'en',
+      limit: String(limit),
+      apiKey: this.apiKey,
+    })
+
+    try {
+      const res = await fetch(`${GEO_API}?${params}`)
+      if (!res.ok) return []
+      const data: GeoapifyResponse = await res.json()
+      return data.features
+        .filter((f) => VALID_TYPES.has(f.properties.result_type))
+        .map((f) => this.featureToPlace(q, f))
+    } catch {
+      return []
+    }
+  }
+
   async resolve(query: string): Promise<PlaceResult> {
     const q = query.trim()
     if (!q || !this.apiKey) {
       return { found: false, query: q, message: UNSUPPORTED_MESSAGE }
     }
-
-    // ── STUB: uncomment the block below when Step 3 is confirmed ──────────
-    //
-    // const params = new URLSearchParams({
-    //   text:   q,
-    //   lang:   'en',        // request English names; add lang=zh for Chinese
-    //   limit:  '1',
-    //   type:   'city',      // prioritise city results; drop for broader search
-    //   apiKey: this.apiKey,
-    // })
-    // const url = `https://api.geoapify.com/v1/geocode/search?${params}`
-    //
-    // try {
-    //   const res = await fetch(url)
-    //   if (!res.ok) return { found: false, query: q, message: UNSUPPORTED_MESSAGE }
-    //   const data: GeoapifyResponse = await res.json()
-    //   const feature = data.features[0]
-    //   if (!feature) return { found: false, query: q, message: UNSUPPORTED_MESSAGE }
-    //   return this.featureToPlace(q, feature)
-    // } catch {
-    //   return { found: false, query: q, message: UNSUPPORTED_MESSAGE }
-    // }
-    // ──────────────────────────────────────────────────────────────────────
-
-    // Remove this return when enabling the block above:
-    return { found: false, query: q, message: UNSUPPORTED_MESSAGE }
+    const candidates = await this.resolveMany(q, 1)
+    return candidates[0] ?? { found: false, query: q, message: UNSUPPORTED_MESSAGE }
   }
 
-  // Maps a Geoapify feature to the normalized ResolvedPlace shape.
-  // Called by the real implementation block above (currently commented out).
   featureToPlace(query: string, f: GeoapifyFeature): ResolvedPlace {
     const p = f.properties
     const countryId = p.country_code.toUpperCase()   // "de" → "DE"

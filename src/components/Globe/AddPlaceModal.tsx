@@ -4,8 +4,10 @@ import { COUNTRIES } from '../../data/countries'
 import { CITIES } from '../../data/cities'
 import { GlassCard } from '../UI/GlassCard'
 import { usePlaceStore } from '../../store/placeStore'
-import { resolvePlace } from '../../services/placeResolver'
-import type { PlaceResult } from '../../types/place'
+import { resolvePlace, resolvePlaceCandidates } from '../../services/placeResolver'
+import { addUserPlace } from '../../services/visitService'
+import { useAuthStore } from '../../store/authStore'
+import type { ResolvedPlace } from '../../types/place'
 import type { AchievementPlace } from './PlaceAchievement'
 
 interface AddPlaceModalProps {
@@ -35,8 +37,9 @@ export function AddPlaceModal({ onClose, onPlaceAdded }: AddPlaceModalProps) {
   const [query, setQuery] = useState('')
   const [adding, setAdding] = useState<string | null>(null)
   const [justAdded, setJustAdded] = useState<Set<string>>(new Set())
-  // Resolver hint shown only when the direct search finds nothing
-  const [resolverHint, setResolverHint] = useState<PlaceResult | null>(null)
+  const [geoapifyCandidates, setGeoapifyCandidates] = useState<ResolvedPlace[]>([])
+  const [geocoding, setGeocoding] = useState(false)
+  const [addedGeoIds, setAddedGeoIds] = useState<Set<string>>(new Set())
 
   const addCity = usePlaceStore((s) => s.addCity)
   const addCountry = usePlaceStore((s) => s.addCountry)
@@ -83,20 +86,28 @@ export function AddPlaceModal({ onClose, onPlaceAdded }: AddPlaceModalProps) {
     return out.slice(0, 20)
   }, [query, countryNameMap])
 
-  // When direct search finds nothing, ask placeResolver for an informative hint.
-  // Local resolution is O(1) so this is effectively instant for local data.
-  // When Step 2 (Geoapify) is added, this is where external lookup will also kick in.
+  // When local search finds nothing, debounce then call Geoapify for candidates.
   useEffect(() => {
     const q = query.trim()
     if (!q || results.length > 0) {
-      setResolverHint(null)
+      setGeoapifyCandidates([])
+      setGeocoding(false)
       return
     }
+    setGeocoding(true)
     let alive = true
-    resolvePlace(q).then((r) => {
-      if (alive) setResolverHint(r)
-    })
-    return () => { alive = false }
+    const timer = setTimeout(() => {
+      resolvePlaceCandidates(q).then((candidates) => {
+        if (alive) {
+          setGeoapifyCandidates(candidates)
+          setGeocoding(false)
+        }
+      })
+    }, 400)
+    return () => {
+      alive = false
+      clearTimeout(timer)
+    }
   }, [query, results.length])
 
   const handleAdd = async (result: SearchResult) => {
@@ -137,6 +148,32 @@ export function AddPlaceModal({ onClose, onPlaceAdded }: AddPlaceModalProps) {
             const capital = CITIES.find((c) => c.countryId === resolved.countryId && c.isCapital)
             onPlaceAdded({ kind: 'country', name: resolved.displayName, capitalName: capital?.name })
           }
+        }
+      }
+    } finally {
+      setAdding(null)
+    }
+  }
+
+  const handleAddGeoCandidate = async (candidate: ResolvedPlace) => {
+    const userId = useAuthStore.getState().user?.id
+    if (!userId) return
+    setAdding(candidate.id)
+    try {
+      const result = await addUserPlace(userId, {
+        placeType: candidate.type === 'country' ? 'country' : 'city',
+        countryId: candidate.countryId,
+        cityId: candidate.type === 'city' ? candidate.id : null,
+      })
+      if ('ok' in result) {
+        setAddedGeoIds((prev) => new Set([...prev, candidate.id]))
+        onClose()
+        if (onPlaceAdded) {
+          onPlaceAdded(
+            candidate.type === 'country'
+              ? { kind: 'country', name: candidate.displayName }
+              : { kind: 'city', name: candidate.displayName, countryName: candidate.countryName },
+          )
         }
       }
     } finally {
@@ -247,26 +284,51 @@ export function AddPlaceModal({ onClose, onPlaceAdded }: AddPlaceModalProps) {
                   )
                 })}
               </ul>
-            ) : resolverHint?.found ? (
-              // Resolver found something (likely a landmark) but it can't be added directly
-              <div className="py-8 text-center space-y-1.5">
-                <p className="text-sm font-semibold text-pink-700">
-                  {resolverHint.displayName}
-                  <span className="ml-1.5 text-[10px] font-normal text-pink-400">
-                    {resolverHint.displayNameEn}
-                  </span>
-                </p>
-                <p className="text-[10px] text-pink-400">{resolverHint.countryName}</p>
-                <p className="mt-2 text-xs text-amber-600">
-                  {resolverHint.type === 'landmark'
-                    ? '已找到该地标，暂不支持直接添加。请搜索所在城市进行添加。'
-                    : '该地点暂不支持直接添加。'}
-                </p>
-              </div>
+            ) : geocoding ? (
+              <p className="text-xs text-pink-400 text-center py-8">🌐 正在搜索全球城市…</p>
+            ) : geoapifyCandidates.length > 0 ? (
+              <ul className="space-y-2">
+                <li className="px-1 pb-0.5">
+                  <span className="text-[10px] text-blue-400 font-medium">🌐 全球定位结果</span>
+                </li>
+                {geoapifyCandidates.map((c) => {
+                  const added = addedGeoIds.has(c.id)
+                  const busy = adding === c.id
+                  return (
+                    <li
+                      key={c.id}
+                      className="flex items-center justify-between gap-3 rounded-xl bg-white/50 border border-blue-100 px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-sm font-semibold text-pink-800">{c.displayName}</span>
+                          <span className="text-[10px] text-pink-400">{c.displayNameEn}</span>
+                          <span className="text-[9px] bg-blue-100 text-blue-500 px-1.5 py-0.5 rounded-full">
+                            🌐 全球
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-pink-400 mt-0.5">
+                          {c.type === 'city' ? `🏙️ 城市 · ${c.countryName}` : `🌍 国家 · ${c.countryId}`}
+                        </div>
+                      </div>
+                      <button
+                        disabled={added || busy}
+                        onClick={() => handleAddGeoCandidate(c)}
+                        className={`flex-shrink-0 rounded-xl px-3 py-1.5 text-xs font-medium transition ${
+                          added
+                            ? 'bg-pink-50 text-pink-300 cursor-default'
+                            : 'bg-gradient-to-r from-blue-400 to-indigo-400 text-white hover:from-blue-500 hover:to-indigo-500 active:scale-95'
+                        }`}
+                      >
+                        {busy ? '添加中…' : added ? '✓ 已添加' : '+ 添加'}
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
             ) : (
-              // Not found in any local dataset — show resolver message
               <p className="text-xs text-pink-400 text-center py-8">
-                {resolverHint?.message ?? '没有找到匹配的城市或国家'}
+                没有找到匹配的城市或国家
               </p>
             )}
           </div>
