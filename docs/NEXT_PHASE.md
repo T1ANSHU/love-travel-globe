@@ -1,10 +1,10 @@
-# Project Status: Phase 6 Complete — Production Live
+# Project Status: Phase 6 + Global Place System Complete — Production Live
 
 ## Status
 
-**Phase 6 is complete. The production URL is live and fully verified by the user.**
+**Phase 6 is complete. The Global Place Location System (Geoapify) is complete. Both are live and verified in production.**
 
-All development phases (1 → 2 → 3 → 4 → 5 → 5.5 → 6) are finished and manually tested.
+All development phases (1 → 2 → 3 → 4 → 5 → 5.5 → 6 → Post-Launch) are finished and manually tested.
 Supabase Auth (Site URL + Redirect URLs) and Vercel environment variables are correctly configured.
 See `docs/PROJECT_PROGRESS.md` for the full history.
 
@@ -15,6 +15,14 @@ See `docs/PROJECT_PROGRESS.md` for the full history.
 - **Step 1**: Dynamic photo tag filtering — FilterPanel chips from `photoStore.photos`; multi-select; null-safety
 - **Step 2**: City memory card — travel date range + photo count summary in city AlbumModal
 - **Step 3**: Vercel deployment — `vercel.json` SPA rewrite; env vars confirmed; production smoke test passed
+
+## What the Post-Launch Global Place System delivered
+
+- Geoapify geocoding API integrated — any city worldwide is now searchable and addable
+- Geocoded cities render on globe with marker + label, zoom-aware visibility
+- Persistence: 6 new columns on `user_places` (Migration M001 applied to production DB)
+- Delete, sidebar search, and fly-to all work for geocoded cities
+- See `docs/PROJECT_PROGRESS.md` → "Post-Launch Enhancement" section for full details
 
 ---
 

@@ -1,6 +1,6 @@
 # Project Progress
 
-Last updated: 2026-05-09 (Phase 6 complete — UI Polish experiments started on `ui-polish-experiments` branch)
+Last updated: 2026-05-10 (Global Place Location System / Geoapify complete on main — UI Polish experiments on `ui-polish-experiments` branch)
 
 ## Completed
 
@@ -195,6 +195,66 @@ Last updated: 2026-05-09 (Phase 6 complete — UI Polish experiments started on 
   - Photo upload confirmed working in production
   - Data persists after page refresh in production
   - Supabase environment variables correctly configured on Vercel
+
+### Post-Launch Enhancement — Global Place Location System (Geoapify)
+
+> Merged to `main`. Verified in production.
+
+**Purpose**: Allow users to add any city in the world, not just cities in the local static dataset (`cities.ts`).
+
+#### Features shipped
+
+- **Geoapify geocoding integration** (`src/services/geocoding/geoapifyResolver.ts`): `resolveMany(query, limit)` fetches Geoapify Places API, filters to `city/county/state/country` result types, returns `ResolvedPlace[]`; `VITE_GEOAPIFY_API_KEY` env var; zero fallback to stub
+- **PlaceResolverChain** (`src/services/placeResolver.ts`): chains `LocalPlaceResolver → GeoapifyResolver`; exports `resolvePlaceCandidates(query)` for AddPlaceModal UI
+- **Global search in AddPlaceModal**: after local results, shows dashed "搜索全球更多结果" button; clicking triggers Geoapify fetch with 500ms debounce; results deduplicated against local hits via `countryId:nameEn.toLowerCase()` key; "🌐 全球定位" badge on each Geoapify card; already-added detection via `userAddedCityIds`
+- **Geocoded cities on globe**: `geocodedPlaces: Map<string, ResolvedPlace>` in placeStore feeds into `recomputeVisible()` — geocoded cities render as pink dots (`pointsData`) with HTML labels (`htmlElementsData`) identically to local cities
+- **Zoom-aware label visibility**: capitals always labeled; non-capital city labels hidden when camera altitude ≥ 1.5; crossing the threshold triggers `recomputeVisible()` once via `onZoom` callback (no per-frame rebuild); geocoded cities follow the same threshold rule
+- **Persistence after refresh**: 6 new columns added to `user_places` (`place_source`, `display_name`, `name_en`, `country_name`, `lat`, `lng`); Migration M001 SQL block in `supabase/schema.sql`; `fetchUserPlaces` reconstructs `ResolvedPlace` from DB fields when `place_source = 'geocoding_api'` and `getCityById` returns undefined
+- **Immediate delete**: `removeCityId()` now also evicts from `geocodedPlaces` in the same Zustand `set()` call — globe marker and label disappear without refresh
+- **Sidebar search includes geocoded cities**: `SearchPanel` queries `geocodedPlaces.values()` filtered by query match, deduped against local static results, merged into results list (max 8 total)
+- **Fly-to for geocoded cities**: `setFlyToRequest({ lat, lng, altitude: 1.0 })` works identically — already lat/lng based, no static lookup needed
+
+#### Schema change (Migration M001)
+
+```sql
+ALTER TABLE user_places ADD COLUMN IF NOT EXISTS place_source TEXT DEFAULT 'local';
+ALTER TABLE user_places ADD COLUMN IF NOT EXISTS display_name TEXT;
+ALTER TABLE user_places ADD COLUMN IF NOT EXISTS name_en      TEXT;
+ALTER TABLE user_places ADD COLUMN IF NOT EXISTS country_name TEXT;
+ALTER TABLE user_places ADD COLUMN IF NOT EXISTS lat          DOUBLE PRECISION;
+ALTER TABLE user_places ADD COLUMN IF NOT EXISTS lng          DOUBLE PRECISION;
+```
+
+Run in Supabase SQL Editor on any existing installation. Safe to re-run (`IF NOT EXISTS`).
+
+#### Future improvements (not yet implemented)
+
+- Add `place_cache` table to cache Geoapify results server-side and reduce API calls
+- Improve Chinese alias handling (e.g. 慕尼黑 → Munich) for cities with no Chinese name in Geoapify response
+- Better cross-source duplicate detection for edge cases (same city returned by both local data and Geoapify)
+
+#### Files changed (main branch)
+
+- `src/services/geocoding/geoapifyResolver.ts` — real implementation (replaced stub)
+- `src/services/placeResolver.ts` — wired GeoapifyResolver into chain; added `resolvePlaceCandidates()`
+- `src/store/placeStore.ts` — added `geocodedPlaces`, `addGeocodedPlace`, extended `fetchUserPlaces` + `removeCityId`
+- `src/services/visitService.ts` — extended `addUserPlace` input with 6 geocoding fields
+- `src/types/database.ts` — extended `DbUserPlace` with 6 nullable fields
+- `supabase/schema.sql` — added columns to `CREATE TABLE` block + Migration M001 at end
+- `src/components/Globe/GlobeScene.tsx` — module-level `recomputeVisible()`, zoom threshold logic, geocoded rendering
+- `src/components/Globe/AddPlaceModal.tsx` — Geoapify candidates UI, debounce, dedup, "搜索全球更多结果" button
+- `src/components/Sidebar/SearchPanel.tsx` — geocodedPlaces search merged into results
+
+#### Production verification
+
+- Add Hamburg (not in local dataset) → marker + label appears on globe
+- Refresh → Hamburg persists
+- Delete Hamburg → disappears immediately from globe
+- Sidebar search "Hamburg" → result found, click → camera flies to Hamburg
+- Zoom in → non-capital labels appear; zoom out → hide; capitals always visible
+- `npm run build` passes, TypeScript zero errors
+
+---
 
 ## UI Polish — In Progress (branch: `ui-polish-experiments`)
 
