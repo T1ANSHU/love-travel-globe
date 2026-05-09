@@ -134,8 +134,14 @@ function pointColorCallback(d: object): string {
 
 function pointRadiusCallback(d: object): number {
   const c = d as { id: string }
-  if (replayCurrentCityId && c.id === replayCurrentCityId) return 1.2
-  return visitedCityIds.has(c.id) ? 0.85 : 0.5
+  // Scale radius with altitude so the dot stays roughly constant in screen-space as
+  // the camera zooms in. At far distances (alt ≥ 1.5) radius is at full size;
+  // below that it shrinks proportionally, with a minimum floor so it stays visible.
+  // This also keeps the marker area clean for the future landmark model that will
+  // emerge from the dot when zoomed in.
+  const altScale = Math.min(1.0, Math.max(0.28, currentAltitude / 1.5))
+  if (replayCurrentCityId && c.id === replayCurrentCityId) return 1.0 * altScale
+  return (visitedCityIds.has(c.id) ? 0.75 : 0.42) * altScale
 }
 
 function arcColorCallback(d: object): string[] {
@@ -238,8 +244,10 @@ function recomputeVisible() {
   g.htmlElementsData([...staticLabels, ...geocodedLabels])
 }
 
-// Minimal zoom-gated city name label — no card, no border, surface-level text only.
-// Click/hover are handled by the marker dot (onPointHover / onPointClick).
+// Zoom-gated city name label — minimal, surface-level, offset beside the marker.
+// Positioned to the right so the space directly above the dot stays clear for the
+// future landmark model that will emerge there in a later stage.
+// Click/hover handled by the marker dot (onPointHover / onPointClick).
 function buildMinimalLabel(d: object): HTMLElement {
   const item = d as { name: string }
   const wrapper = document.createElement('div')
@@ -247,15 +255,21 @@ function buildMinimalLabel(d: object): HTMLElement {
     'pointer-events: none',
     'user-select: none',
     'white-space: nowrap',
-    'transform: translate(-50%, calc(-100% - 8px))',
+    // Offset to the right of the marker center, vertically centered on it
+    'transform: translate(13px, -50%)',
   ].join(';')
   wrapper.innerHTML = `<span style="
-    font-size: 11px;
+    display: inline-block;
+    font-size: 10.5px;
     font-weight: 500;
-    color: rgba(255,255,255,0.9);
-    text-shadow: 0 1px 4px rgba(0,0,0,0.85), 0 0 8px rgba(0,0,0,0.6);
-    font-family: system-ui, sans-serif;
-    letter-spacing: 0.03em;
+    color: rgba(255,210,228,0.93);
+    text-shadow: 0 1px 3px rgba(0,0,0,0.95), 0 0 10px rgba(0,0,0,0.55);
+    font-family: system-ui, -apple-system, sans-serif;
+    letter-spacing: 0.06em;
+    background: rgba(10,0,20,0.36);
+    border-radius: 3px;
+    padding: 2px 5px;
+    line-height: 1.25;
   ">${item.name}</span>`
   return wrapper
 }
@@ -358,9 +372,10 @@ export function GlobeScene() {
 
       .onZoom(({ altitude }: { altitude: number }) => {
         useGlobeStore.getState().setCameraAltitude(altitude)
-        // Only rebuild labels when crossing the zoom-in/out threshold
         const wasZoomed = currentAltitude < CITY_NAME_THRESHOLD
         currentAltitude = altitude
+        // Re-evaluate radius on every zoom tick so dot scales smoothly with altitude
+        globe.pointRadius(pointRadiusCallback)
         const isZoomed = altitude < CITY_NAME_THRESHOLD
         if (isZoomed !== wasZoomed) recomputeVisible()
       })
