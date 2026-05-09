@@ -1,8 +1,11 @@
 # Globe Visualization Redesign Plan
 
 **Status**: Step 0 complete (documentation) — Stage 1 implementation pending
-**Date**: 2026-05-10
+**Last updated**: 2026-05-10
 **Branch**: main
+
+See `docs/GLOBE_VISUAL_CONCEPT.md` for the authoritative visual rule set.
+See `docs/GLOBE_VISUAL_BACKLOG.md` for deferred Stage 3 items.
 
 ---
 
@@ -11,20 +14,32 @@
 This site is a **romantic shared travel memory globe**, not a world reference map.
 The globe should feel minimal, elegant, and premium.
 
-The visualization system has three stages of work. Only user-unlocked places should
-ever render on the globe. The globe is a personal artifact, not a geographic reference.
+Only user-unlocked places ever render on the globe.
+The globe is a personal artifact — it grows as the user adds memories, not before.
 
 ---
 
-## Core Rules (Non-Negotiable)
+## Core Display Rules (Non-Negotiable)
 
-1. **No default markers** — no city dots visible before the user adds anything
-2. **No default labels** — no floating city name tags before the user adds anything
-3. **Unlocked = visible** — only user-added places (local or Geoapify) render on the globe
-4. **Country boundaries globally visible** — the globe should feel like a map without being a city reference
-5. **City names only when zoomed in** — names are contextual, not ambient
-6. **Static data stays** — cities.ts / countries.ts data is kept for search, upload, and dropdowns
-7. **Stats only from photos** — static city data has zero impact on travel statistics
+### Unadded / locked cities
+- No marker dot
+- No city name
+- No glow or highlight
+- No city boundary polygon
+- Static data (cities.ts / countries.ts) stays for search and dropdowns — invisible on globe
+
+### Added / unlocked cities
+- Show a small marker dot
+- Show city name when zoomed in (altitude < ~0.7)
+- Can show city area glow / boundary (Stage 3)
+
+### Globe-wide (always visible)
+- Country / continent-level boundary lines — lightweight, subtle
+- NO city-level boundaries at startup — too heavy and visually noisy
+- City boundaries appear only after the user unlocks that city (Stage 3)
+
+### Stats
+- Travel statistics come only from `photoStore.photos` — static city data has zero impact
 
 ---
 
@@ -33,124 +48,100 @@ ever render on the globe. The globe is a personal artifact, not a geographic ref
 ### Currently Used
 | Layer | API | Current State |
 |---|---|---|
-| Globe texture | `.globeImageUrl()` | Blue marble satellite (photorealistic) |
-| Atmosphere | `.showAtmosphere()` | Pink halo |
-| City markers | `.pointsData()` | Initialized with ALL capital city IDs (wrong) |
-| City labels | `.htmlElementsData()` | Floating glass-card HTML over capitals (wrong) |
+| Globe texture | `.globeImageUrl()` | Blue marble satellite (wrong direction) |
+| Atmosphere | `.showAtmosphere()` | Pink halo — keep |
+| City markers | `.pointsData()` | Initialized with ALL capitals (wrong — remove) |
+| City labels | `.htmlElementsData()` | Floating glass-card HTML over capitals (wrong — remove) |
 | Route arcs | `.arcsData()` | Travel arcs — correct, keep |
 
 ### Available But Not Yet Used
 | Layer | API | Planned Use |
 |---|---|---|
 | Country polygons | `.polygonsData()` | Country boundary outlines (Stage 2) |
-| Pulse rings | `.ringsData()` | City unlock glow effect (Stage 3) |
-| Custom layer | `.customLayerData()` | Tyndall/beam effect on unlock (Stage 3) |
+| Pulse rings | `.ringsData()` | City unlock glow (Stage 3) |
+| Custom layer | `.customLayerData()` | Tyndall/beam unlock effect (Stage 3) |
 
 ---
 
 ## Stage 1 — Logic Clean-up (Next to implement)
 
-**Goal**: Remove all default-capital rendering. Establish correct model: only user-unlocked places visible.
+**Goal**: Remove all default-capital rendering. Establish correct model.
 
 ### What to remove from GlobeScene.tsx
-- `CAPITAL_CITY_IDS` constant (rendering use only — not needed by placeStore)
+- `CAPITAL_CITY_IDS` constant (rendering-only — placeStore uses `c.isCapital` field instead)
 - `GLOBAL_LABELS` constant and all landmark-based label logic
 - `directCapitalLabels` computation block
-- `capitalLabels` / `nonCapitalLabels` labeling split
-- Old `LABEL_ALTITUDE_THRESHOLD` logic (threshold concept kept but repurposed)
-- Init `.pointsData(CITY_POINTS.filter(CAPITAL_CITY_IDS))` → change to `.pointsData([])`
-- Init `.htmlElementsData(GLOBAL_LABELS.filter(...))` → change to `.htmlElementsData([])`
-- `buildLabelElement()` glass-card HTML structure (old floating label style)
+- `capitalLabels` / `nonCapitalLabels` split
+- Init `.pointsData(CITY_POINTS.filter(CAPITAL_CITY_IDS))` → `.pointsData([])`
+- Init `.htmlElementsData(GLOBAL_LABELS.filter(...))` → `.htmlElementsData([])`
+- `buildLabelElement()` glass-card HTML (old floating label — replaced)
 
 ### New recomputeVisible() logic
 ```
 visible = userAddedCityIds ∪ photoCityIds ∪ geocodedPlaces.keys()
 
-pointsData  = CITY_POINTS.filter(visible) + geocodedPoints
-htmlElementsData = minimal city name labels for visible cities, zoom-gated at altitude < 0.7
+pointsData       = CITY_POINTS.filter(visible) ∪ geocodedPoints
+htmlElementsData = compact city name labels for visible cities
+                   shown only when altitude < CITY_NAME_THRESHOLD (≈ 0.7)
 ```
 
-### New city label style (temporary bridge)
+### New city label style (temporary bridge — not the final design)
 - No background card, no border, no blur
-- Small text only: `font-size: 11px`, `color: rgba(255,255,255,0.9)`, light `text-shadow`
-- Positioned beside/below the marker dot (not above it in a tall card)
-- Visible only when `altitude < CITY_NAME_THRESHOLD` (≈ 0.7)
-- Marker dot remains visible at all zoom levels
+- Small text: `font-size: 11px`, `color: rgba(255,255,255,0.9)`, subtle `text-shadow`
+- Positioned beside/below the marker dot
+- Visible only when zoomed in (altitude < 0.7)
+- Marker dot visible at all zoom levels
 
-### What does NOT change
-- All user add/delete/search/fly-to logic
+### What does NOT change in Stage 1
+- All user add/delete/search/fly-to behavior
 - Geoapify geocoded city rendering
-- Arc route replay
-- Album modal, photo upload, auth
-- cities.ts / countries.ts static data (search and dropdowns still work)
-- placeStore capital lookup (`c.isCapital` field — not affected by removing CAPITAL_CITY_IDS)
+- Arc route replay, album modal, photo upload, auth
+- cities.ts / countries.ts static data
+- placeStore capital lookup logic
 
 ---
 
 ## Stage 2 — Country Boundaries (After Stage 1)
 
-**Goal**: Make the globe feel geographically grounded without being a city reference map.
+**Goal**: Make the globe feel geographically real without being a city reference map.
+
+### Boundary scope — country level only
+- **Only country / continent boundaries** are loaded globally at startup
+- **No city-level boundaries at startup** — too many, too heavy, visually noisy
+- City boundaries appear only after unlock (Stage 3)
 
 ### Data
-- **Source**: Natural Earth 110m countries GeoJSON (public domain / CC0)
+- **Source**: Natural Earth 110m countries GeoJSON (CC0 public domain)
 - **Location**: `src/data/world-countries-110m.geo.json`
-- **Load method**: static import (bundled, no CDN dependency)
-- **Size**: ~400KB raw, ~18KB gzip — acceptable for inline bundle
+- **Load method**: static import bundled at build time — no CDN, no runtime fetch
+- **Size**: ~400 KB raw / ~18 KB gzip — acceptable
 
 ### Rendering
-```
+```javascript
 globe
   .polygonsData(worldGeoJSON.features)
-  .polygonCapColor(() => 'rgba(255, 255, 255, 0.03)')   // very light fill
-  .polygonSideColor(() => 'rgba(0, 0, 0, 0)')
-  .polygonStrokeColor(() => 'rgba(255, 255, 255, 0.22)') // subtle white boundary
+  .polygonCapColor(() => 'rgba(255,255,255,0.03)')    // near-invisible fill
+  .polygonSideColor(() => 'rgba(0,0,0,0)')
+  .polygonStrokeColor(() => 'rgba(255,255,255,0.22)') // subtle white boundary
   .polygonsTransitionDuration(0)
 ```
 
 ### Altitude behavior
-- At high altitude: boundary lines at full opacity
-- At low altitude (city zoom): boundary lines fade out (not distracting)
-- No per-city boundary polygons in this stage
+- High altitude: boundary lines at full opacity
+- Low altitude (city zoom): boundary lines fade (not distracting up close)
 
 ---
 
-## Stage 3 — Unlock Effects & Final Visual (Deferred to UI Polish)
+## Stage 3 — Deferred to UI Polish
 
-**These are NOT implemented now. Design direction only.**
+See `docs/GLOBE_VISUAL_BACKLOG.md` for full detail.
 
-### Globe texture
-- Replace blue marble with a cartoon / illustrated / stylized texture
-- Options: custom-painted tile URL, or custom Three.js material
-- Color palette: warm pastels, dreamlike, romantic
-
-### City unlock moment (coordinated animation)
-When a new city is first added:
-1. Camera flies to city → zooms in
-2. At arrival: marker dot appears + pulse ring expands outward (ringsData)
-3. Soft upward beam / Tyndall light rises from city location (customLayerData or CSS)
-4. City name fades in (anchored to map, not floating)
-5. Existing `PlaceAchievement` toast animation continues unchanged
-6. Total duration: ~2s for globe effects, PlaceAchievement runs in parallel
-
-### City focus effect (lighter, for search fly-to of already-added city)
-- Camera flies + zooms
-- Brief ring pulse (shorter, lower opacity)
-- City name becomes visible
-- No beam effect
-
-### City name anchoring (final design)
-- Name rendered as `htmlElementsData` element, but restyled:
-  - No card background
-  - Text sits horizontally at map surface level
-  - Color: distinct from marker (e.g. white or cream vs pink marker)
-  - Small dot connector between name and marker
-  - Visible only when zoomed in (altitude < 0.6)
-
-### City area glow
-- Per-unlocked-city: small GeoJSON polygon loaded on demand
-- Rendered via `polygonsData` with glowing fill color
-- Separate from global country boundary layer
-- Data strategy: pre-bundle major city polygons, lazy-load others
+Summary:
+- Globe texture swap (blue marble → cartoon / illustrated)
+- City unlock animation (ring pulse + Tyndall beam + coordinated timing)
+- Per-city area boundary polygon (loaded on demand after unlock)
+- City area glow / highlight for unlocked cities
+- Anchored city name final visual design (no card, surface-level text)
 
 ---
 
@@ -159,8 +150,8 @@ When a new city is first added:
 ```
 src/
   data/
-    cities.ts                         — static city data (search, dropdown)
-    countries.ts                      — static country data (search, dropdown)
+    cities.ts                         — static city data (search + dropdowns only)
+    countries.ts                      — static country data (search + dropdowns only)
     world-countries-110m.geo.json     — country boundary polygons (Stage 2)
   components/
     Globe/
@@ -170,9 +161,10 @@ src/
       PlaceAchievement.tsx            — unlock toast animation
 
 docs/
-  GLOBE_REDESIGN_PLAN.md             — this file
+  GLOBE_REDESIGN_PLAN.md             — this file (implementation plan)
+  GLOBE_VISUAL_CONCEPT.md            — authoritative visual rule set
+  GLOBE_VISUAL_BACKLOG.md            — Stage 3 deferred items
   globe-references/                  — visual reference images and links
-    .gitkeep
 ```
 
 ---
@@ -180,19 +172,6 @@ docs/
 ## Implementation Checklist
 
 - [x] Step 0: Documentation + folders created
-- [ ] Stage 1: Remove default-capital rendering, minimal zoom-gated city name
-- [ ] Stage 2: Country boundary GeoJSON + polygonsData integration
-- [ ] Stage 3: Unlock animation, city glow, cartoon texture (UI Polish phase)
-
----
-
-## References Folder
-
-Place inspiration images, screenshots, and design reference links in:
-`docs/globe-references/`
-
-Suggested categories:
-- `cartoon-globe/` — stylized globe textures and art directions
-- `city-unlock/` — animation references for unlock moments
-- `country-boundary/` — boundary style references (minimal, elegant)
-- `overall-ui/` — full UI composition references
+- [ ] Stage 1: Remove default-capital rendering; minimal zoom-gated city name
+- [ ] Stage 2: Country-level boundary GeoJSON + polygonsData (country scope only)
+- [ ] Stage 3: Unlock animation, city glow, per-city boundary, cartoon texture (UI Polish)
