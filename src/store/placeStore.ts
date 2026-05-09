@@ -7,8 +7,8 @@ import type { ResolvedPlace } from '../types/place'
 interface PlaceStoreState {
   userAddedCityIds: Set<string>
   userAddedCountryIds: Set<string>
-  /** In-memory map of Geoapify-sourced places (place_id → ResolvedPlace). Persists in Supabase but
-   *  only rehydrated here on the current session — globe rendering reads this for extra markers. */
+  /** Geoapify-sourced places (place_id → ResolvedPlace). Persisted to Supabase and rehydrated on
+   *  fetchUserPlaces. Globe rendering reads this map to display geocoded markers + labels. */
   geocodedPlaces: Map<string, ResolvedPlace>
   loading: boolean
   fetchUserPlaces: (userId: string) => Promise<void>
@@ -30,19 +30,44 @@ export const usePlaceStore = create<PlaceStoreState>((set) => ({
       const places = await getUserPlaces(userId)
       const cityIds = new Set<string>()
       const countryIds = new Set<string>()
+      const geocodedPlaces = new Map<string, ResolvedPlace>()
+
       for (const p of places) {
         if (p.place_type === 'city' && p.city_id) {
           const city = getCityById(p.city_id)
-          if (city) cityIds.add(city.id)
+          if (city) {
+            // Local city — resolved by static data
+            cityIds.add(city.id)
+          } else if (
+            p.place_source === 'geocoding_api' &&
+            p.lat != null && p.lng != null && p.display_name
+          ) {
+            // Geocoded city — reconstruct ResolvedPlace from persisted fields
+            const restored: ResolvedPlace = {
+              found: true,
+              type: 'city',
+              id: p.city_id,
+              displayName: p.display_name,
+              displayNameEn: p.name_en ?? p.display_name,
+              countryId: p.country_id,
+              countryName: p.country_name ?? p.country_id,
+              lat: p.lat,
+              lng: p.lng,
+              cityId: p.city_id,
+              isCapital: false,
+              source: 'geocoding_api',
+            }
+            geocodedPlaces.set(p.city_id, restored)
+            cityIds.add(p.city_id)
+          }
         }
         if (p.place_type === 'country') {
           countryIds.add(p.country_id)
-          // When a country was added, also surface its capital
           const capital = CITIES.find((c) => c.countryId === p.country_id && c.isCapital)
           if (capital) cityIds.add(capital.id)
         }
       }
-      set({ userAddedCityIds: cityIds, userAddedCountryIds: countryIds, loading: false })
+      set({ userAddedCityIds: cityIds, userAddedCountryIds: countryIds, geocodedPlaces, loading: false })
     } catch {
       set({ loading: false })
     }
@@ -65,6 +90,12 @@ export const usePlaceStore = create<PlaceStoreState>((set) => ({
       placeType: place.type === 'country' ? 'country' : 'city',
       countryId: place.countryId,
       cityId: place.type === 'city' ? place.id : null,
+      placeSource: 'geocoding_api',
+      displayName: place.displayName,
+      nameEn: place.displayNameEn,
+      countryName: place.countryName,
+      lat: place.lat,
+      lng: place.lng,
     })
     if ('ok' in result) {
       set((s) => {

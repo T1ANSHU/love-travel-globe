@@ -16,6 +16,13 @@ export interface DbUserPlace {
   city_id: string | null
   landmark_id: string | null
   place_key: string
+  // Geocoding source fields (NULL for local places)
+  place_source: string | null       // 'local' | 'geocoding_api'
+  display_name: string | null
+  name_en: string | null
+  country_name: string | null
+  lat: number | null
+  lng: number | null
   visited: boolean
   first_visit_date: string | null
   last_visit_date: string | null

@@ -33,6 +33,14 @@ CREATE TABLE IF NOT EXISTS user_places (
     END
   ) STORED,
 
+  -- Geocoding source fields — NULL for local (city/country/landmark) places
+  place_source     TEXT DEFAULT 'local',   -- 'local' | 'geocoding_api'
+  display_name     TEXT,                   -- canonical display name (any language)
+  name_en          TEXT,                   -- English name
+  country_name     TEXT,                   -- human-readable country name
+  lat              DOUBLE PRECISION,       -- latitude from geocoding API
+  lng              DOUBLE PRECISION,       -- longitude from geocoding API
+
   visited          BOOLEAN DEFAULT FALSE,
   first_visit_date DATE,
   last_visit_date  DATE,
@@ -198,3 +206,17 @@ CREATE POLICY "user_settings_update_own" ON user_settings
 
 CREATE POLICY "user_settings_delete_own" ON user_settings
   FOR DELETE USING (auth.uid() = id);
+
+
+-- ============================================================
+-- Migration M001 — add geocoding fields to user_places
+-- Run this block in the Supabase SQL Editor on any existing
+-- installation that was created before these columns existed.
+-- IF NOT EXISTS makes it safe to re-run.
+-- ============================================================
+ALTER TABLE user_places ADD COLUMN IF NOT EXISTS place_source TEXT DEFAULT 'local';
+ALTER TABLE user_places ADD COLUMN IF NOT EXISTS display_name TEXT;
+ALTER TABLE user_places ADD COLUMN IF NOT EXISTS name_en      TEXT;
+ALTER TABLE user_places ADD COLUMN IF NOT EXISTS country_name TEXT;
+ALTER TABLE user_places ADD COLUMN IF NOT EXISTS lat          DOUBLE PRECISION;
+ALTER TABLE user_places ADD COLUMN IF NOT EXISTS lng          DOUBLE PRECISION;
