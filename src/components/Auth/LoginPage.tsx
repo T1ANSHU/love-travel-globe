@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -36,7 +36,11 @@ export function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-dreamy flex items-center justify-center p-4">
+    // --glass-bg override: raises auth card opacity (0.82) without touching global glass-card
+    <div
+      className="min-h-screen bg-dreamy flex items-center justify-center p-4"
+      style={{ '--glass-bg': 'rgba(255,255,255,0.82)' } as React.CSSProperties}
+    >
       <ParticlesBackground />
 
       {/* Decorative blobs */}
@@ -46,11 +50,12 @@ export function LoginPage() {
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-64 w-64 rounded-full bg-rose-200/30 blur-3xl" />
       </div>
 
+      {/* relative z-10 creates a stacking context at z=10, above fixed particles at z=0 */}
       <motion.div
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: 'easeOut' }}
-        className="w-full max-w-md"
+        className="w-full max-w-md relative z-10"
       >
         {/* Header */}
         <div className="mb-8 text-center">

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -47,9 +47,13 @@ export function RegisterPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-dreamy flex items-center justify-center p-4">
+      <div
+        className="min-h-screen bg-dreamy flex items-center justify-center p-4"
+        style={{ '--glass-bg': 'rgba(255,255,255,0.82)' } as React.CSSProperties}
+      >
         <ParticlesBackground />
-        <GlassCard className="p-10 max-w-md w-full text-center">
+        {/* relative z-10: paints above fixed particles (z=0) */}
+        <GlassCard className="p-10 max-w-md w-full text-center relative z-10">
           <div className="text-5xl mb-4">💌</div>
           <h2 className="text-xl font-semibold text-pink-800 mb-2">注册成功！</h2>
           <p className="text-pink-500 text-sm">
@@ -64,7 +68,10 @@ export function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-dreamy flex items-center justify-center p-4">
+    <div
+      className="min-h-screen bg-dreamy flex items-center justify-center p-4"
+      style={{ '--glass-bg': 'rgba(255,255,255,0.82)' } as React.CSSProperties}
+    >
       <ParticlesBackground />
 
       {/* Decorative blobs */}
@@ -73,11 +80,12 @@ export function RegisterPage() {
         <div className="absolute -bottom-20 -right-20 h-96 w-96 rounded-full bg-purple-200/40 blur-3xl" />
       </div>
 
+      {/* relative z-10: stacking context at z=10, above fixed particles at z=0 */}
       <motion.div
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: 'easeOut' }}
-        className="w-full max-w-md"
+        className="w-full max-w-md relative z-10"
       >
         <div className="mb-8 text-center">
           <motion.div
