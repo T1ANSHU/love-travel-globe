@@ -2,20 +2,26 @@ import { create } from 'zustand'
 import { getUserPlaces, addUserPlace } from '../services/visitService'
 import { useAuthStore } from './authStore'
 import { CITIES, getCityById } from '../data/cities'
+import type { ResolvedPlace } from '../types/place'
 
 interface PlaceStoreState {
   userAddedCityIds: Set<string>
   userAddedCountryIds: Set<string>
+  /** In-memory map of Geoapify-sourced places (place_id → ResolvedPlace). Persists in Supabase but
+   *  only rehydrated here on the current session — globe rendering reads this for extra markers. */
+  geocodedPlaces: Map<string, ResolvedPlace>
   loading: boolean
   fetchUserPlaces: (userId: string) => Promise<void>
   addCity: (cityId: string, countryId: string) => Promise<{ ok: true } | { error: string }>
   addCountry: (countryId: string) => Promise<{ ok: true } | { error: string }>
+  addGeocodedPlace: (place: ResolvedPlace) => Promise<{ ok: true } | { error: string }>
   removeCityId: (cityId: string) => void
 }
 
 export const usePlaceStore = create<PlaceStoreState>((set) => ({
   userAddedCityIds: new Set(),
   userAddedCountryIds: new Set(),
+  geocodedPlaces: new Map(),
   loading: false,
 
   fetchUserPlaces: async (userId: string) => {
@@ -48,6 +54,27 @@ export const usePlaceStore = create<PlaceStoreState>((set) => ({
     const result = await addUserPlace(userId, { placeType: 'city', countryId, cityId })
     if ('ok' in result) {
       set((s) => ({ userAddedCityIds: new Set([...s.userAddedCityIds, cityId]) }))
+    }
+    return result
+  },
+
+  addGeocodedPlace: async (place: ResolvedPlace) => {
+    const userId = useAuthStore.getState().user?.id
+    if (!userId) return { error: '未登录' }
+    const result = await addUserPlace(userId, {
+      placeType: place.type === 'country' ? 'country' : 'city',
+      countryId: place.countryId,
+      cityId: place.type === 'city' ? place.id : null,
+    })
+    if ('ok' in result) {
+      set((s) => {
+        const newGeocodedPlaces = new Map(s.geocodedPlaces)
+        newGeocodedPlaces.set(place.id, place)
+        return {
+          geocodedPlaces: newGeocodedPlaces,
+          userAddedCityIds: new Set([...s.userAddedCityIds, place.id]),
+        }
+      })
     }
     return result
   },

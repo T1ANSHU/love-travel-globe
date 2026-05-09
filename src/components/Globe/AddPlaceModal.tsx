@@ -5,8 +5,6 @@ import { CITIES } from '../../data/cities'
 import { GlassCard } from '../UI/GlassCard'
 import { usePlaceStore } from '../../store/placeStore'
 import { resolvePlace, resolvePlaceCandidates } from '../../services/placeResolver'
-import { addUserPlace } from '../../services/visitService'
-import { useAuthStore } from '../../store/authStore'
 import type { ResolvedPlace } from '../../types/place'
 import type { AchievementPlace } from './PlaceAchievement'
 
@@ -39,10 +37,11 @@ export function AddPlaceModal({ onClose, onPlaceAdded }: AddPlaceModalProps) {
   const [justAdded, setJustAdded] = useState<Set<string>>(new Set())
   const [geoapifyCandidates, setGeoapifyCandidates] = useState<ResolvedPlace[]>([])
   const [geocoding, setGeocoding] = useState(false)
-  const [addedGeoIds, setAddedGeoIds] = useState<Set<string>>(new Set())
+  const [showGeoSearch, setShowGeoSearch] = useState(false)
 
   const addCity = usePlaceStore((s) => s.addCity)
   const addCountry = usePlaceStore((s) => s.addCountry)
+  const addGeocodedPlace = usePlaceStore((s) => s.addGeocodedPlace)
   const userAddedCityIds = usePlaceStore((s) => s.userAddedCityIds)
   const userAddedCountryIds = usePlaceStore((s) => s.userAddedCountryIds)
 
@@ -86,11 +85,34 @@ export function AddPlaceModal({ onClose, onPlaceAdded }: AddPlaceModalProps) {
     return out.slice(0, 20)
   }, [query, countryNameMap])
 
-  // When local search finds nothing, debounce then call Geoapify for candidates.
+  // Keys used to deduplicate Geoapify candidates against local results
+  const localDedupKeys = useMemo(() => {
+    const keys = new Set<string>()
+    for (const r of results) {
+      if (r.kind === 'country') keys.add(`country:${r.id}`)
+      if (r.kind === 'city') keys.add(`city:${r.countryId}:${r.nameEn.trim().toLowerCase()}`)
+    }
+    return keys
+  }, [results])
+
+  // Geoapify candidates with local duplicates removed
+  const filteredCandidates = useMemo(() => {
+    return geoapifyCandidates.filter((c) => {
+      if (c.type === 'country') return !localDedupKeys.has(`country:${c.countryId}`)
+      return !localDedupKeys.has(`city:${c.countryId}:${c.displayNameEn.trim().toLowerCase()}`)
+    })
+  }, [geoapifyCandidates, localDedupKeys])
+
+  // Reset global search mode when the query changes
+  useEffect(() => {
+    setShowGeoSearch(false)
+    setGeoapifyCandidates([])
+  }, [query])
+
+  // Call Geoapify when: no local results (always), or user explicitly requests global search
   useEffect(() => {
     const q = query.trim()
-    if (!q || results.length > 0) {
-      setGeoapifyCandidates([])
+    if (!q || (results.length > 0 && !showGeoSearch)) {
       setGeocoding(false)
       return
     }
@@ -108,7 +130,7 @@ export function AddPlaceModal({ onClose, onPlaceAdded }: AddPlaceModalProps) {
       alive = false
       clearTimeout(timer)
     }
-  }, [query, results.length])
+  }, [query, results.length, showGeoSearch])
 
   const handleAdd = async (result: SearchResult) => {
     const key = `${result.kind}:${result.id}`
@@ -156,17 +178,10 @@ export function AddPlaceModal({ onClose, onPlaceAdded }: AddPlaceModalProps) {
   }
 
   const handleAddGeoCandidate = async (candidate: ResolvedPlace) => {
-    const userId = useAuthStore.getState().user?.id
-    if (!userId) return
     setAdding(candidate.id)
     try {
-      const result = await addUserPlace(userId, {
-        placeType: candidate.type === 'country' ? 'country' : 'city',
-        countryId: candidate.countryId,
-        cityId: candidate.type === 'city' ? candidate.id : null,
-      })
+      const result = await addGeocodedPlace(candidate)
       if ('ok' in result) {
-        setAddedGeoIds((prev) => new Set([...prev, candidate.id]))
         onClose()
         if (onPlaceAdded) {
           onPlaceAdded(
@@ -238,105 +253,134 @@ export function AddPlaceModal({ onClose, onPlaceAdded }: AddPlaceModalProps) {
               <p className="text-xs text-pink-400 text-center py-8">
                 输入城市或国家名称进行搜索 🔍
               </p>
-            ) : results.length > 0 ? (
-              <ul className="space-y-2">
-                {results.map((r) => {
-                  const key = `${r.kind}:${r.id}`
-                  const added = isAdded(r)
-                  const busy = adding === key
-                  return (
-                    <li
-                      key={key}
-                      className="flex items-center justify-between gap-3 rounded-xl bg-white/50 border border-pink-100 px-3 py-2"
-                    >
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-sm font-semibold text-pink-800">{r.name}</span>
-                          <span className="text-[10px] text-pink-400">{r.nameEn}</span>
-                          {r.kind === 'city' && r.isCapital && (
-                            <span className="text-[9px] bg-pink-100 text-pink-600 px-1.5 py-0.5 rounded-full">
-                              首都
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-[10px] text-pink-400 mt-0.5">
-                          {r.kind === 'city'
-                            ? `🏙️ 城市 · ${r.countryName}`
-                            : '🌍 国家'}
-                          {r.kind === 'country' && !r.hasCapital && (
-                            <span className="ml-1 text-amber-500">（当前数据暂无首都）</span>
-                          )}
-                        </div>
-                      </div>
-
-                      <button
-                        disabled={added || busy}
-                        onClick={() => handleAdd(r)}
-                        className={`flex-shrink-0 rounded-xl px-3 py-1.5 text-xs font-medium transition ${
-                          added
-                            ? 'bg-pink-50 text-pink-300 cursor-default'
-                            : 'bg-gradient-to-r from-pink-400 to-rose-400 text-white hover:from-pink-500 hover:to-rose-500 active:scale-95'
-                        }`}
-                      >
-                        {busy ? '添加中…' : added ? '✓ 已添加' : '+ 添加'}
-                      </button>
-                    </li>
-                  )
-                })}
-              </ul>
-            ) : geocoding ? (
-              <p className="text-xs text-pink-400 text-center py-8">🌐 正在搜索全球城市…</p>
-            ) : geoapifyCandidates.length > 0 ? (
-              <ul className="space-y-2">
-                <li className="px-1 pb-0.5">
-                  <span className="text-[10px] text-blue-400 font-medium">🌐 全球定位结果</span>
-                </li>
-                {geoapifyCandidates.map((c) => {
-                  const added = addedGeoIds.has(c.id)
-                  const busy = adding === c.id
-                  return (
-                    <li
-                      key={c.id}
-                      className="flex items-center justify-between gap-3 rounded-xl bg-white/50 border border-blue-100 px-3 py-2"
-                    >
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-sm font-semibold text-pink-800">{c.displayName}</span>
-                          <span className="text-[10px] text-pink-400">{c.displayNameEn}</span>
-                          <span className="text-[9px] bg-blue-100 text-blue-500 px-1.5 py-0.5 rounded-full">
-                            🌐 全球
-                          </span>
-                        </div>
-                        <div className="text-[10px] text-pink-400 mt-0.5">
-                          {c.type === 'city' ? `🏙️ 城市 · ${c.countryName}` : `🌍 国家 · ${c.countryId}`}
-                        </div>
-                      </div>
-                      <button
-                        disabled={added || busy}
-                        onClick={() => handleAddGeoCandidate(c)}
-                        className={`flex-shrink-0 rounded-xl px-3 py-1.5 text-xs font-medium transition ${
-                          added
-                            ? 'bg-pink-50 text-pink-300 cursor-default'
-                            : 'bg-gradient-to-r from-blue-400 to-indigo-400 text-white hover:from-blue-500 hover:to-indigo-500 active:scale-95'
-                        }`}
-                      >
-                        {busy ? '添加中…' : added ? '✓ 已添加' : '+ 添加'}
-                      </button>
-                    </li>
-                  )
-                })}
-              </ul>
             ) : (
-              <p className="text-xs text-pink-400 text-center py-8">
-                没有找到匹配的城市或国家
-              </p>
+              <>
+                {/* ── Local results ── */}
+                {results.length > 0 && (
+                  <ul className="space-y-2">
+                    {results.map((r) => {
+                      const key = `${r.kind}:${r.id}`
+                      const added = isAdded(r)
+                      const busy = adding === key
+                      return (
+                        <li
+                          key={key}
+                          className="flex items-center justify-between gap-3 rounded-xl bg-white/50 border border-pink-100 px-3 py-2"
+                        >
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-sm font-semibold text-pink-800">{r.name}</span>
+                              <span className="text-[10px] text-pink-400">{r.nameEn}</span>
+                              {r.kind === 'city' && r.isCapital && (
+                                <span className="text-[9px] bg-pink-100 text-pink-600 px-1.5 py-0.5 rounded-full">
+                                  首都
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[10px] text-pink-400 mt-0.5">
+                              {r.kind === 'city'
+                                ? `🏙️ 城市 · ${r.countryName}`
+                                : '🌍 国家'}
+                              {r.kind === 'country' && !r.hasCapital && (
+                                <span className="ml-1 text-amber-500">（当前数据暂无首都）</span>
+                              )}
+                            </div>
+                          </div>
+                          <button
+                            disabled={added || busy}
+                            onClick={() => handleAdd(r)}
+                            className={`flex-shrink-0 rounded-xl px-3 py-1.5 text-xs font-medium transition ${
+                              added
+                                ? 'bg-pink-50 text-pink-300 cursor-default'
+                                : 'bg-gradient-to-r from-pink-400 to-rose-400 text-white hover:from-pink-500 hover:to-rose-500 active:scale-95'
+                            }`}
+                          >
+                            {busy ? '添加中…' : added ? '✓ 已添加' : '+ 添加'}
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+
+                {/* ── Global search trigger / results ── */}
+                {results.length > 0 && !showGeoSearch && (
+                  <button
+                    className="mt-3 w-full rounded-xl border border-dashed border-blue-200 py-2 text-[11px] text-blue-400 hover:border-blue-400 hover:text-blue-600 transition"
+                    onClick={() => setShowGeoSearch(true)}
+                  >
+                    🌐 搜索全球更多结果
+                  </button>
+                )}
+
+                {/* ── Geoapify candidates (shown when no local results, or showGeoSearch) ── */}
+                {(results.length === 0 || showGeoSearch) && (
+                  geocoding ? (
+                    <p className={`text-xs text-blue-400 text-center py-${results.length > 0 ? '3' : '8'}`}>
+                      🌐 正在搜索全球城市…
+                    </p>
+                  ) : filteredCandidates.length > 0 ? (
+                    <div className={results.length > 0 ? 'mt-3' : ''}>
+                      {results.length > 0 && (
+                        <p className="mb-1.5 px-1 text-[10px] font-medium text-blue-400">🌐 全球定位结果</p>
+                      )}
+                      <ul className="space-y-2">
+                        {filteredCandidates.map((c) => {
+                          const added = userAddedCityIds.has(c.id)
+                          const busy = adding === c.id
+                          return (
+                            <li
+                              key={c.id}
+                              className="flex items-center justify-between gap-3 rounded-xl bg-white/50 border border-blue-100 px-3 py-2"
+                            >
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="text-sm font-semibold text-pink-800">{c.displayName}</span>
+                                  <span className="text-[10px] text-pink-400">{c.displayNameEn}</span>
+                                  <span className="text-[9px] bg-blue-100 text-blue-500 px-1.5 py-0.5 rounded-full">
+                                    🌐 全球
+                                  </span>
+                                </div>
+                                <div className="text-[10px] text-pink-400 mt-0.5">
+                                  {c.type === 'city'
+                                    ? `🏙️ 城市 · ${c.countryName}`
+                                    : `🌍 国家 · ${c.countryId}`}
+                                </div>
+                              </div>
+                              <button
+                                disabled={added || busy}
+                                onClick={() => handleAddGeoCandidate(c)}
+                                className={`flex-shrink-0 rounded-xl px-3 py-1.5 text-xs font-medium transition ${
+                                  added
+                                    ? 'bg-pink-50 text-pink-300 cursor-default'
+                                    : 'bg-gradient-to-r from-blue-400 to-indigo-400 text-white hover:from-blue-500 hover:to-indigo-500 active:scale-95'
+                                }`}
+                              >
+                                {busy ? '添加中…' : added ? '✓ 已添加' : '+ 添加'}
+                              </button>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    </div>
+                  ) : results.length === 0 ? (
+                    <p className="text-xs text-pink-400 text-center py-8">
+                      没有找到匹配的城市或国家
+                    </p>
+                  ) : (
+                    <p className="mt-3 text-xs text-blue-400 text-center py-2">
+                      没有找到其他全球结果
+                    </p>
+                  )
+                )}
+              </>
             )}
           </div>
 
           {/* Footer hint */}
           <div className="px-5 py-2 border-t border-pink-100 flex-shrink-0">
             <p className="text-[10px] text-pink-400 text-center">
-              添加后城市将出现在地球上 · 目前仅支持已收录城市 💕
+              添加后将在地球上显示标记 · 点击「全球更多结果」可搜索全球城市 💕
             </p>
           </div>
         </GlassCard>

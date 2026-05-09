@@ -449,7 +449,7 @@ export function GlobeScene() {
         }
       }
 
-      // User-explicitly-added cities
+      // User-explicitly-added cities (local IDs only; geocoded IDs handled below)
       for (const id of userAddedCityIds) visible.add(id)
 
       // User-added countries → surface their capital
@@ -458,8 +458,31 @@ export function GlobeScene() {
         if (capital) visible.add(capital.id)
       }
 
-      g.pointsData(CITY_POINTS.filter((c) => visible.has(c.id)))
-      g.htmlElementsData(GLOBAL_LABELS.filter((l) => l.cityId && visible.has(l.cityId)))
+      // Geocoded places (Geoapify) — extra points + labels not in static arrays
+      const { geocodedPlaces } = usePlaceStore.getState()
+      const geocodedPoints = [...geocodedPlaces.values()].map((p) => ({
+        id: p.id,
+        lat: p.lat,
+        lng: p.lng,
+        name: p.displayName,
+        nameEn: p.displayNameEn,
+        countryId: p.countryId,
+      }))
+      // Synthetic label objects — shape matches what buildLabelElement reads (name, id, cityId, countryId)
+      const geocodedLabels = [...geocodedPlaces.values()].map((p) => ({
+        id: p.id,
+        lat: p.lat,
+        lng: p.lng,
+        name: p.displayName,
+        cityId: p.id,
+        countryId: p.countryId,
+      }))
+
+      g.pointsData([...CITY_POINTS.filter((c) => visible.has(c.id)), ...geocodedPoints])
+      g.htmlElementsData([
+        ...GLOBAL_LABELS.filter((l) => l.cityId && visible.has(l.cityId)),
+        ...geocodedLabels,
+      ])
     }
 
     recomputeVisible()
@@ -470,7 +493,8 @@ export function GlobeScene() {
     const unsubPlace = usePlaceStore.subscribe((state, prev) => {
       if (
         state.userAddedCityIds !== prev.userAddedCityIds ||
-        state.userAddedCountryIds !== prev.userAddedCountryIds
+        state.userAddedCountryIds !== prev.userAddedCountryIds ||
+        state.geocodedPlaces !== prev.geocodedPlaces
       ) recomputeVisible()
     })
     return () => { unsubPhoto(); unsubPlace() }
