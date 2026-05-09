@@ -1,10 +1,9 @@
 /**
- * GeoapifyResolver — Step 3 stub (NOT yet wired into PlaceResolverChain).
+ * GeoapifyResolver — active; wired as Step 2 in PlaceResolverChain (placeResolver.ts).
  *
- * To enable when ready:
+ * Requirements:
  *   1. Set VITE_GEOAPIFY_API_KEY in .env.local (get key at geoapify.com).
  *   2. In Geoapify dashboard → set HTTP Referrer to your production domain.
- *   3. In src/services/placeResolver.ts, uncomment the GeoapifyResolver line.
  *
  * Security model:
  *   Geoapify is a client-side geocoding API (same model as Mapbox / HERE).

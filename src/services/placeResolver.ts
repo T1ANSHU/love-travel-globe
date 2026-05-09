@@ -7,10 +7,8 @@
  *     Searches CITIES / COUNTRIES / LANDMARKS by id, zh name, en name.
  *     Synchronous, zero network, instant response.
  *
- *   Step 2 — GeoapifyResolver (stub ready, not yet wired)
+ *   Step 2 — GeoapifyResolver (active)
  *     File: src/services/geocoding/geoapifyResolver.ts
- *     To enable: set VITE_GEOAPIFY_API_KEY, uncomment the fetch block in the
- *     stub, then uncomment the line in the chain array below.
  *     Env var: VITE_GEOAPIFY_API_KEY (browser-safe; set Referrer restriction in dashboard)
  *
  *   Step 3 — SupabaseCacheResolver (future, not yet added)

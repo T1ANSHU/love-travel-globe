@@ -1,8 +1,8 @@
 // Resolved place types for the centralized place resolution system.
-// Designed for a three-step chain:
-//   Step 1 (current): local CITIES / COUNTRIES / LANDMARKS static data
-//   Step 2 (future):  external geocoding API (Geoapify / OpenCage)
-//   Step 3 (future):  Supabase place_cache table for resolved results
+// Three-step chain:
+//   Step 1 (active): local CITIES / COUNTRIES / LANDMARKS static data
+//   Step 2 (active): Geoapify geocoding API (GeoapifyResolver)
+//   Step 3 (future): Supabase place_cache table for resolved results
 
 export type PlaceType = 'city' | 'country' | 'landmark'
 
