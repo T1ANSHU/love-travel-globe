@@ -101,6 +101,11 @@ let visitedCountryIds: Set<string> = new Set()
 let activeArcIndex = -1          // -1 = no active arc (not playing)
 let replayCurrentCityId = ''     // '' = not playing
 
+// Zoom-aware label visibility — updated by onZoom, read by recomputeVisible
+let currentAltitude = 2.4
+// Below this altitude non-capital city labels become visible (≈ one-continent view)
+const LABEL_ALTITUDE_THRESHOLD = 1.5
+
 // ── Callback functions at module level ───────────────────────────────────────
 
 function pauseRotation() {
@@ -176,6 +181,71 @@ function arcAltitudeCallback(d: object): number {
   const a = Math.sin(Δφ / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2
   const angularDist = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
   return Math.max(0.065, (angularDist / Math.PI) * 0.38)
+}
+
+// Rebuilds pointsData and htmlElementsData from current store state + altitude.
+// Module-level so both the onZoom callback and store subscriptions can call it.
+function recomputeVisible() {
+  const g = globeApiRef
+  if (!g) return
+
+  const photos = usePhotoStore.getState().photos
+  const { userAddedCityIds, userAddedCountryIds, geocodedPlaces } = usePlaceStore.getState()
+
+  const visible = new Set(CAPITAL_CITY_IDS)
+
+  for (const p of photos) {
+    if (p.city_id) {
+      const city = getCityById(p.city_id)
+      if (city) visible.add(city.id)
+    }
+  }
+
+  for (const id of userAddedCityIds) visible.add(id)
+
+  for (const countryId of userAddedCountryIds) {
+    const capital = CITIES.find((c) => c.countryId === countryId && c.isCapital)
+    if (capital) visible.add(capital.id)
+  }
+
+  const geocodedPoints = [...geocodedPlaces.values()].map((p) => ({
+    id: p.id,
+    lat: p.lat,
+    lng: p.lng,
+    name: p.displayName,
+    nameEn: p.displayNameEn,
+    countryId: p.countryId,
+  }))
+
+  g.pointsData([...CITY_POINTS.filter((c) => visible.has(c.id)), ...geocodedPoints])
+
+  // Capital labels: always visible regardless of zoom
+  const capitalLabels = GLOBAL_LABELS.filter(
+    (l) => l.cityId && CAPITAL_CITY_IDS.has(l.cityId) && visible.has(l.cityId),
+  )
+
+  const zoomed = currentAltitude < LABEL_ALTITUDE_THRESHOLD
+
+  // Non-capital static labels (uncommon — most GLOBAL_LABELS are capitals): zoom-gated
+  const nonCapitalLabels = zoomed
+    ? GLOBAL_LABELS.filter(
+        (l) => l.cityId && !CAPITAL_CITY_IDS.has(l.cityId) && visible.has(l.cityId),
+      )
+    : []
+
+  // Geocoded place labels: treated as non-capital unless ResolvedPlace.isCapital is true
+  const geocodedLabels = [...geocodedPlaces.values()]
+    .filter((p) => p.isCapital || zoomed)
+    .map((p) => ({
+      id: p.id,
+      lat: p.lat,
+      lng: p.lng,
+      name: p.displayName,
+      cityId: p.id,
+      countryId: p.countryId,
+    }))
+
+  g.htmlElementsData([...capitalLabels, ...nonCapitalLabels, ...geocodedLabels])
 }
 
 function buildLabelElement(d: object): HTMLElement {
@@ -352,6 +422,11 @@ export function GlobeScene() {
 
       .onZoom(({ altitude }: { altitude: number }) => {
         useGlobeStore.getState().setCameraAltitude(altitude)
+        // Only rebuild labels when crossing the capital/non-capital visibility threshold
+        const wasZoomed = currentAltitude < LABEL_ALTITUDE_THRESHOLD
+        currentAltitude = altitude
+        const isZoomed = altitude < LABEL_ALTITUDE_THRESHOLD
+        if (isZoomed !== wasZoomed) recomputeVisible()
       })
 
     // Track cursor position for hover preview card placement (used by setHoveredCity)
@@ -432,59 +507,6 @@ export function GlobeScene() {
 
   // ── Sync visible markers (capitals + user-added + photo cities) ──────
   useEffect(() => {
-    const recomputeVisible = () => {
-      const g = globeApiRef
-      if (!g) return
-
-      const photos = usePhotoStore.getState().photos
-      const { userAddedCityIds, userAddedCountryIds } = usePlaceStore.getState()
-
-      const visible = new Set(CAPITAL_CITY_IDS)
-
-      // Cities with photos
-      for (const p of photos) {
-        if (p.city_id) {
-          const city = getCityById(p.city_id)
-          if (city) visible.add(city.id)
-        }
-      }
-
-      // User-explicitly-added cities (local IDs only; geocoded IDs handled below)
-      for (const id of userAddedCityIds) visible.add(id)
-
-      // User-added countries → surface their capital
-      for (const countryId of userAddedCountryIds) {
-        const capital = CITIES.find((c) => c.countryId === countryId && c.isCapital)
-        if (capital) visible.add(capital.id)
-      }
-
-      // Geocoded places (Geoapify) — extra points + labels not in static arrays
-      const { geocodedPlaces } = usePlaceStore.getState()
-      const geocodedPoints = [...geocodedPlaces.values()].map((p) => ({
-        id: p.id,
-        lat: p.lat,
-        lng: p.lng,
-        name: p.displayName,
-        nameEn: p.displayNameEn,
-        countryId: p.countryId,
-      }))
-      // Synthetic label objects — shape matches what buildLabelElement reads (name, id, cityId, countryId)
-      const geocodedLabels = [...geocodedPlaces.values()].map((p) => ({
-        id: p.id,
-        lat: p.lat,
-        lng: p.lng,
-        name: p.displayName,
-        cityId: p.id,
-        countryId: p.countryId,
-      }))
-
-      g.pointsData([...CITY_POINTS.filter((c) => visible.has(c.id)), ...geocodedPoints])
-      g.htmlElementsData([
-        ...GLOBAL_LABELS.filter((l) => l.cityId && visible.has(l.cityId)),
-        ...geocodedLabels,
-      ])
-    }
-
     recomputeVisible()
 
     const unsubPhoto = usePhotoStore.subscribe((state, prev) => {
