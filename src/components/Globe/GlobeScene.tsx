@@ -1,13 +1,12 @@
 import { useEffect, useRef } from 'react'
 import Globe from 'globe.gl'
 import { CITIES, getCityById } from '../../data/cities'
-import { LANDMARKS } from '../../data/landmarks'
 import { useGlobeStore } from '../../store/globeStore'
 import { usePhotoStore } from '../../store/photoStore'
 import { useReplayStore } from '../../store/replayStore'
 import { usePlaceStore } from '../../store/placeStore'
 import { audioService } from '../../services/audioService'
-import type { BaseCity, BaseLandmark } from '../../types/travel'
+import type { BaseCity } from '../../types/travel'
 import type { PhotoWithUrl } from '../../store/photoStore'
 
 function _initGlobe(el: HTMLElement) { return new Globe(el) }
@@ -22,12 +21,6 @@ const CITY_POINTS = CITIES.map((c) => ({
   nameEn: c.nameEn,
   countryId: c.countryId,
 }))
-
-// Capital city IDs — default visible set on first load
-const CAPITAL_CITY_IDS = new Set(CITIES.filter((c) => c.isCapital).map((c) => c.id))
-
-// All global-level landmarks (city labels)
-const GLOBAL_LABELS = LANDMARKS.filter((l) => l.level === 'global')
 
 interface ArcDatum {
   arcIndex: number
@@ -103,8 +96,8 @@ let replayCurrentCityId = ''     // '' = not playing
 
 // Zoom-aware label visibility — updated by onZoom, read by recomputeVisible
 let currentAltitude = 2.4
-// Below this altitude non-capital city labels become visible (≈ one-continent view)
-const LABEL_ALTITUDE_THRESHOLD = 1.5
+// Below this altitude city name labels become visible (city-level zoom)
+const CITY_NAME_THRESHOLD = 0.7
 
 // ── Callback functions at module level ───────────────────────────────────────
 
@@ -184,6 +177,7 @@ function arcAltitudeCallback(d: object): number {
 }
 
 // Rebuilds pointsData and htmlElementsData from current store state + altitude.
+// Only user-initiated places render — no default capitals or reference data.
 // Module-level so both the onZoom callback and store subscriptions can call it.
 function recomputeVisible() {
   const g = globeApiRef
@@ -192,7 +186,8 @@ function recomputeVisible() {
   const photos = usePhotoStore.getState().photos
   const { userAddedCityIds, userAddedCountryIds, geocodedPlaces } = usePlaceStore.getState()
 
-  const visible = new Set(CAPITAL_CITY_IDS)
+  // Only user-initiated places are visible
+  const visible = new Set<string>()
 
   for (const p of photos) {
     if (p.city_id) {
@@ -203,6 +198,7 @@ function recomputeVisible() {
 
   for (const id of userAddedCityIds) visible.add(id)
 
+  // User added a country → show its capital as a proxy marker
   for (const countryId of userAddedCountryIds) {
     const capital = CITIES.find((c) => c.countryId === countryId && c.isCapital)
     if (capital) visible.add(capital.id)
@@ -219,121 +215,48 @@ function recomputeVisible() {
 
   g.pointsData([...CITY_POINTS.filter((c) => visible.has(c.id)), ...geocodedPoints])
 
-  // Capital labels sourced from global-level landmarks (existing capitals with landmark entries)
-  const capitalLabels = GLOBAL_LABELS.filter(
-    (l) => l.cityId && CAPITAL_CITY_IDS.has(l.cityId) && visible.has(l.cityId),
-  )
+  // City name labels — only when zoomed in close enough
+  if (currentAltitude >= CITY_NAME_THRESHOLD) {
+    g.htmlElementsData([])
+    return
+  }
 
-  // Capitals that have no global landmark entry — generate label directly from city data
-  const landmarkCoveredIds = new Set(capitalLabels.map((l) => l.cityId!))
-  const directCapitalLabels = CITY_POINTS.filter(
-    (c) => CAPITAL_CITY_IDS.has(c.id) && visible.has(c.id) && !landmarkCoveredIds.has(c.id),
-  ).map((c) => ({
+  const staticLabels = CITY_POINTS.filter((c) => visible.has(c.id)).map((c) => ({
     id: c.id,
     lat: c.lat,
     lng: c.lng,
     name: c.name,
-    cityId: c.id,
-    countryId: c.countryId,
   }))
 
-  const zoomed = currentAltitude < LABEL_ALTITUDE_THRESHOLD
+  const geocodedLabels = [...geocodedPlaces.values()].map((p) => ({
+    id: p.id,
+    lat: p.lat,
+    lng: p.lng,
+    name: p.displayName,
+  }))
 
-  // Non-capital static labels (uncommon — most GLOBAL_LABELS are capitals): zoom-gated
-  const nonCapitalLabels = zoomed
-    ? GLOBAL_LABELS.filter(
-        (l) => l.cityId && !CAPITAL_CITY_IDS.has(l.cityId) && visible.has(l.cityId),
-      )
-    : []
-
-  // Geocoded place labels: treated as non-capital unless ResolvedPlace.isCapital is true
-  const geocodedLabels = [...geocodedPlaces.values()]
-    .filter((p) => p.isCapital || zoomed)
-    .map((p) => ({
-      id: p.id,
-      lat: p.lat,
-      lng: p.lng,
-      name: p.displayName,
-      cityId: p.id,
-      countryId: p.countryId,
-    }))
-
-  g.htmlElementsData([...capitalLabels, ...directCapitalLabels, ...nonCapitalLabels, ...geocodedLabels])
+  g.htmlElementsData([...staticLabels, ...geocodedLabels])
 }
 
-function buildLabelElement(d: object): HTMLElement {
-  const lm = d as BaseLandmark & { id: string; countryId: string; cityId?: string }
-
-  // Outer wrapper: globe.gl updates left/top every frame — never mutate its transform
+// Minimal zoom-gated city name label — no card, no border, surface-level text only.
+// Click/hover are handled by the marker dot (onPointHover / onPointClick).
+function buildMinimalLabel(d: object): HTMLElement {
+  const item = d as { name: string }
   const wrapper = document.createElement('div')
   wrapper.style.cssText = [
     'pointer-events: none',
     'user-select: none',
-    'text-align: center',
-    'transform: translate(-50%, -100%)',
+    'white-space: nowrap',
+    'transform: translate(-50%, calc(-100% - 8px))',
   ].join(';')
-
-  // Inner element: all hover/click effects here only
-  const inner = document.createElement('div')
-  inner.style.cssText = [
-    'pointer-events: all',
-    'cursor: pointer',
-    'display: inline-block',
-    'transform-origin: center bottom',
-    'transition: transform 0.15s ease',
-    'user-select: none',
-  ].join(';')
-
-  inner.innerHTML = `
-    <div style="
-      background: rgba(255,255,255,0.82);
-      border: 1px solid rgba(249,168,212,0.7);
-      border-radius: 10px;
-      padding: 6px 12px 7px;
-      font-size: 11px;
-      font-weight: 700;
-      color: #831843;
-      white-space: nowrap;
-      backdrop-filter: blur(6px);
-      box-shadow: 0 2px 10px rgba(244,114,182,0.25);
-      margin-bottom: 3px;
-      letter-spacing: 0.02em;
-    ">${lm.name}</div>
-    <div style="
-      width: 5px;
-      height: 5px;
-      background: #f472b6;
-      border-radius: 50%;
-      margin: 0 auto;
-      box-shadow: 0 0 6px rgba(244,114,182,0.9);
-    "></div>
-  `
-
-  inner.addEventListener('mouseenter', () => {
-    const canonicalCityId = lm.cityId ?? lm.id
-    useGlobeStore.getState().setHoveredCity({ cityId: canonicalCityId, x: currentMouseX, y: currentMouseY })
-    inner.style.transform = 'scale(1.12)'
-    audioService.playSfx('city-hover')
-    pauseRotation()
-  })
-
-  inner.addEventListener('mouseleave', () => {
-    useGlobeStore.getState().setHoveredCity(null)
-    inner.style.transform = 'scale(1)'
-    scheduleResumeRotation()
-  })
-
-  inner.addEventListener('click', (e) => {
-    e.stopPropagation()
-    if (isDrag) return
-    inner.style.transform = 'scale(0.92)'
-    setTimeout(() => { inner.style.transform = 'scale(1)' }, 120)
-    // Use canonical cityId from landmark (e.g. 'CN-beijing'), NOT landmark.id ('cn-beijing')
-    const canonicalCityId = lm.cityId ?? lm.id
-    openPlace(canonicalCityId, lm.countryId, lm.name)
-  })
-
-  wrapper.appendChild(inner)
+  wrapper.innerHTML = `<span style="
+    font-size: 11px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.9);
+    text-shadow: 0 1px 4px rgba(0,0,0,0.85), 0 0 8px rgba(0,0,0,0.6);
+    font-family: system-ui, sans-serif;
+    letter-spacing: 0.03em;
+  ">${item.name}</span>`
   return wrapper
 }
 
@@ -385,7 +308,7 @@ export function GlobeScene() {
       .atmosphereColor('#f9a8d4')
       .atmosphereAltitude(0.18)
 
-      .pointsData(CITY_POINTS.filter((c) => CAPITAL_CITY_IDS.has(c.id)))
+      .pointsData([])
       .pointLat('lat')
       .pointLng('lng')
       .pointColor(pointColorCallback)
@@ -394,11 +317,11 @@ export function GlobeScene() {
       .pointLabel(buildPointTooltip)
       .pointsTransitionDuration(0)
 
-      .htmlElementsData(GLOBAL_LABELS.filter((l) => l.cityId && CAPITAL_CITY_IDS.has(l.cityId)))
+      .htmlElementsData([])
       .htmlLat('lat')
       .htmlLng('lng')
       .htmlAltitude(0.04)
-      .htmlElement(buildLabelElement)
+      .htmlElement(buildMinimalLabel)
       .htmlTransitionDuration(0)
 
       .arcsData([] as ArcDatum[])
@@ -435,10 +358,10 @@ export function GlobeScene() {
 
       .onZoom(({ altitude }: { altitude: number }) => {
         useGlobeStore.getState().setCameraAltitude(altitude)
-        // Only rebuild labels when crossing the capital/non-capital visibility threshold
-        const wasZoomed = currentAltitude < LABEL_ALTITUDE_THRESHOLD
+        // Only rebuild labels when crossing the zoom-in/out threshold
+        const wasZoomed = currentAltitude < CITY_NAME_THRESHOLD
         currentAltitude = altitude
-        const isZoomed = altitude < LABEL_ALTITUDE_THRESHOLD
+        const isZoomed = altitude < CITY_NAME_THRESHOLD
         if (isZoomed !== wasZoomed) recomputeVisible()
       })
 
