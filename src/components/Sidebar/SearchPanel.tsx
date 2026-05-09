@@ -3,6 +3,7 @@ import { GlassCard } from '../UI/GlassCard'
 import { CITIES } from '../../data/cities'
 import { COUNTRIES } from '../../data/countries'
 import { useGlobeStore } from '../../store/globeStore'
+import { usePlaceStore } from '../../store/placeStore'
 
 type SearchResult =
   | { kind: 'city'; id: string; name: string; nameEn: string; countryId: string; lat: number; lng: number }
@@ -11,23 +12,47 @@ type SearchResult =
 export function SearchPanel() {
   const [query, setQuery] = useState('')
   const setFlyToRequest = useGlobeStore((s) => s.setFlyToRequest)
+  const geocodedPlaces = usePlaceStore((s) => s.geocodedPlaces)
 
   const results = useMemo<SearchResult[]>(() => {
     const q = query.trim().toLowerCase()
     if (q.length < 1) return []
 
+    // Build local city results and dedup keys in one pass
+    const localCityKeys = new Set<string>()
     const cities: SearchResult[] = CITIES
       .filter((c) => c.name.includes(q) || c.nameEn.toLowerCase().includes(q))
-      .slice(0, 6)
-      .map((c) => ({ kind: 'city', id: c.id, name: c.name, nameEn: c.nameEn, countryId: c.countryId, lat: c.lat, lng: c.lng }))
+      .slice(0, 5)
+      .map((c) => {
+        localCityKeys.add(`${c.countryId}:${c.nameEn.toLowerCase()}`)
+        return { kind: 'city' as const, id: c.id, name: c.name, nameEn: c.nameEn, countryId: c.countryId, lat: c.lat, lng: c.lng }
+      })
 
     const countries: SearchResult[] = COUNTRIES
       .filter((c) => c.name.includes(q) || c.nameEn.toLowerCase().includes(q))
-      .slice(0, 3)
-      .map((c) => ({ kind: 'country', id: c.id, name: c.name, nameEn: c.nameEn, lat: c.centerLat, lng: c.centerLng }))
+      .slice(0, 2)
+      .map((c) => ({ kind: 'country' as const, id: c.id, name: c.name, nameEn: c.nameEn, lat: c.centerLat, lng: c.centerLng }))
 
-    return [...cities, ...countries].slice(0, 8)
-  }, [query])
+    // User-added geocoded places (only what's already in the store — no API call)
+    const geocoded: SearchResult[] = [...geocodedPlaces.values()]
+      .filter((p) => {
+        const matchName = p.displayName.toLowerCase().includes(q) || p.displayNameEn.toLowerCase().includes(q)
+        const isDup = localCityKeys.has(`${p.countryId}:${p.displayNameEn.toLowerCase()}`)
+        return matchName && !isDup
+      })
+      .slice(0, 3)
+      .map((p) => ({
+        kind: 'city' as const,
+        id: p.id,
+        name: p.displayName,
+        nameEn: p.displayNameEn,
+        countryId: p.countryId,
+        lat: p.lat,
+        lng: p.lng,
+      }))
+
+    return [...cities, ...countries, ...geocoded].slice(0, 8)
+  }, [query, geocodedPlaces])
 
   const handleSelect = (r: SearchResult) => {
     setFlyToRequest({ lat: r.lat, lng: r.lng, altitude: r.kind === 'city' ? 1.0 : 1.6 })

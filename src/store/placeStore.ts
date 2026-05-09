@@ -114,7 +114,13 @@ export const usePlaceStore = create<PlaceStoreState>((set) => ({
     set((s) => {
       const newCityIds = new Set(s.userAddedCityIds)
       newCityIds.delete(cityId)
-      return { userAddedCityIds: newCityIds }
+      // Also evict from geocodedPlaces so the globe marker/label disappears immediately
+      if (!s.geocodedPlaces.has(cityId)) {
+        return { userAddedCityIds: newCityIds }
+      }
+      const newGeocodedPlaces = new Map(s.geocodedPlaces)
+      newGeocodedPlaces.delete(cityId)
+      return { userAddedCityIds: newCityIds, geocodedPlaces: newGeocodedPlaces }
     }),
 
   addCountry: async (countryId: string) => {
